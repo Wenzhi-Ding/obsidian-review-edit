@@ -1,0 +1,28 @@
+{
+  "name": "review-edit",
+  "version": "1.0.0",
+  "description": "在编辑器内以 diff 形式审查笔记改动，逐块保留或撤销",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run"
+  },
+  "keywords": ["obsidian", "diff"],
+  "author": "wenzh",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.4.3",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
+    "diff": "^5.2.0",
+    "obsidian": "^1.5.7"
+  }
+}

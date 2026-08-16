@@ -1,0 +1,9 @@
+{
+  "id": "review-edit",
+  "name": "Review Edit",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "在编辑器内以 diff 形式审查笔记改动，逐块保留或撤销（基于文件恢复快照）",
+  "author": "wenzh",
+  "isDesktopOnly": false
+}

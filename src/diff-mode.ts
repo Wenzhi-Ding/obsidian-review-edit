@@ -1,5 +1,5 @@
 import type { App, MarkdownView, Plugin, TFile } from 'obsidian';
-import { computeHunks, type DiffHunk } from './diff-engine';
+import { computeHunks, revertEditSpec, shiftAfterReject, type DiffHunk } from './diff-engine';
 import type { SnapshotEntry } from './snapshot-source';
 import {
   READONLY_OFF,
@@ -45,12 +45,26 @@ export class DiffModeController {
     return true;
   }
 
-  keep(_id: number): void {
-    // Task 6 填充
+  keep(id: number): void {
+    if (!this.session) return;
+    this.session.hunks = this.session.hunks.map(h =>
+      h.id === id ? { ...h, status: 'kept' as const } : h
+    );
+    const cm = (this.session.view.editor as any).cm as EditorView;
+    cm.dispatch({ effects: setHunksEffect.of(this.session.hunks) });
   }
 
-  reject(_id: number): void {
-    // Task 6 填充
+  reject(id: number): void {
+    if (!this.session) return;
+    const cm = (this.session.view.editor as any).cm as EditorView;
+    const hunk = this.session.hunks.find(h => h.id === id);
+    if (!hunk || hunk.status !== 'pending') return;
+    const spec = revertEditSpec(cm.state.doc, hunk);
+    this.session.hunks = shiftAfterReject(this.session.hunks, id);
+    cm.dispatch({
+      changes: spec,
+      effects: setHunksEffect.of(this.session.hunks),
+    });
   }
 
   exit(): void {

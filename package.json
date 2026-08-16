@@ -12,7 +12,7 @@
   "author": "wenzh",
   "license": "MIT",
   "devDependencies": {
-    "@types/diff": "^7.0.2",
+    "@types/diff": "^5.2.3",
     "@types/node": "^20.11.30",
     "builtin-modules": "^3.3.0",
     "esbuild": "^0.20.2",

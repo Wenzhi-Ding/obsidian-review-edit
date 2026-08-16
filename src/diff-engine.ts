@@ -1,3 +1,4 @@
+import type { Text } from '@codemirror/state';
 import { diffLines } from 'diff';
 
 export type HunkStatus = 'pending' | 'kept';
@@ -59,4 +60,33 @@ export function computeHunks(baseline: string, current: string): DiffHunk[] {
     i += removedPart && addedPart ? 2 : 1;
   }
   return hunks;
+}
+
+export function shiftAfterReject(hunks: DiffHunk[], rejectedId: number): DiffHunk[] {
+  const rejected = hunks.find(h => h.id === rejectedId);
+  if (!rejected) return hunks;
+  const delta = countLines(rejected.baselineText) - (rejected.currentTo - rejected.currentFrom);
+  return hunks
+    .filter(h => h.id !== rejectedId)
+    .map(h =>
+      h.currentFrom >= rejected.currentTo
+        ? { ...h, currentFrom: h.currentFrom + delta, currentTo: h.currentTo + delta }
+        : h
+    );
+}
+
+export function revertEditSpec(doc: Text, h: DiffHunk): { from: number; to: number; insert: string } {
+  const from = h.currentFrom < doc.lines ? doc.line(h.currentFrom + 1).from : doc.length;
+  const atEof = h.currentTo >= doc.lines;
+  const to = atEof ? doc.length : doc.line(h.currentTo + 1).from;
+  if (h.currentFrom >= doc.lines) {
+    // 纯删除块落在文档末尾：把基准行追加到文件尾部
+    const endsWithNewline = doc.length > 0 && doc.sliceString(doc.length - 1) === '\n';
+    const lead = doc.length > 0 && !endsWithNewline && h.baselineText !== '' ? '\n' : '';
+    return { from, to, insert: lead + h.baselineText };
+  }
+  if (h.baselineText === '') return { from, to, insert: '' };
+  const endsWithNewline = doc.length > 0 && doc.sliceString(doc.length - 1) === '\n';
+  const insert = atEof && !endsWithNewline ? h.baselineText : h.baselineText + '\n';
+  return { from, to, insert };
 }

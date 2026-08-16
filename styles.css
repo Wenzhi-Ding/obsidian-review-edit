@@ -1,1 +1,35 @@
-/* review-edit styles */
+/* review-edit：差异行 */
+.review-edit-line-added {
+  background-color: rgba(46, 160, 67, 0.16);
+}
+.review-edit-line-kept {
+  background-color: rgba(128, 128, 128, 0.10);
+}
+.review-edit-deleted {
+  background-color: rgba(248, 81, 73, 0.14);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  white-space: pre-wrap;
+}
+.review-edit-deleted > div {
+  padding: 0 6px;
+}
+/* review-edit：差异块工具条 */
+.review-edit-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 2px 0;
+}
+.review-edit-btn {
+  font-size: var(--font-ui-smaller);
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+}
+.review-edit-btn.keep {
+  background: rgba(46, 160, 67, 0.20);
+}
+.review-edit-btn.reject {
+  background: rgba(248, 81, 73, 0.20);
+}

@@ -33,3 +33,19 @@
 .review-edit-btn.reject {
   background: rgba(248, 81, 73, 0.20);
 }
+/* review-edit：快照选择器 */
+.review-edit-snapshot-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.review-edit-snapshot-item {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.review-edit-snapshot-item:hover {
+  background: var(--background-modifier-hover);
+}
+.review-edit-snapshot-meta {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}

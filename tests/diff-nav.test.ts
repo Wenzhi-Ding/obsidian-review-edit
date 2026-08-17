@@ -1,0 +1,85 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest';
+import { DiffNav, adjustNavIndex } from '../src/diff-nav';
+
+describe('adjustNavIndex', () => {
+  it('撤销的块在当前位置之前时，索引前移一位', () => {
+    expect(adjustNavIndex([5, 6, 7, 8], 6, 2)).toBe(1);
+  });
+
+  it('撤销的块在当前位置之后时，索引不变', () => {
+    expect(adjustNavIndex([5, 6, 7, 8], 7, 1)).toBe(1);
+  });
+
+  it('撤销的块就是当前块时，索引停在原地并夹到最后一个', () => {
+    expect(adjustNavIndex([5, 6, 7, 8], 8, 3)).toBe(2);
+    expect(adjustNavIndex([5, 6, 7, 8], 5, 0)).toBe(0);
+  });
+
+  it('只剩一个待处理块并处理后，索引回到 0', () => {
+    expect(adjustNavIndex([5], 5, 0)).toBe(0);
+  });
+
+  it('id 不在待处理列表时按原长度夹取', () => {
+    expect(adjustNavIndex([5, 6], 99, 1)).toBe(1);
+  });
+});
+
+describe('DiffNav', () => {
+  function mounted() {
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    const nav = new DiffNav(onPrev, onNext);
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    nav.mount(container);
+    return { nav, container, onPrev, onNext };
+  }
+
+  it('mount 在容器里加两个导航条（上/下）', () => {
+    const { container } = mounted();
+    const bars = container.querySelectorAll('.review-edit-nav');
+    expect(bars.length).toBe(2);
+    expect(container.querySelector('.review-edit-nav-top')).not.toBeNull();
+    expect(container.querySelector('.review-edit-nav-bottom')).not.toBeNull();
+  });
+
+  it('update 显示「差异 i/n」并在两端禁用对应按钮', () => {
+    const { nav, container } = mounted();
+    nav.update(5, 0);
+    const top = container.querySelector('.review-edit-nav-top')!;
+    expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 1/5');
+    expect((top.querySelector('.review-edit-nav-btn') as HTMLButtonElement).disabled).toBe(true);
+    nav.update(5, 2);
+    expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 3/5');
+    const [prev, next] = Array.from(top.querySelectorAll('.review-edit-nav-btn')) as HTMLButtonElement[];
+    expect(prev.disabled).toBe(false);
+    expect(next.disabled).toBe(false);
+    nav.update(5, 4);
+    expect(next.disabled).toBe(true);
+  });
+
+  it('上下两个导航条内容一致', () => {
+    const { nav, container } = mounted();
+    nav.update(3, 1);
+    const labels = Array.from(container.querySelectorAll('.review-edit-nav-count')).map(e => e.textContent);
+    expect(labels).toEqual(['差异 2/3', '差异 2/3']);
+  });
+
+  it('点击按钮触发回调', () => {
+    const { nav, container, onPrev, onNext } = mounted();
+    nav.update(3, 1);
+    const [prev, next] = Array.from(container.querySelectorAll('.review-edit-nav-bottom .review-edit-nav-btn')) as HTMLButtonElement[];
+    prev.click();
+    expect(onPrev).toHaveBeenCalledTimes(1);
+    next.click();
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('unmount 移除全部导航条且可重复调用', () => {
+    const { nav, container } = mounted();
+    nav.unmount();
+    nav.unmount();
+    expect(container.querySelectorAll('.review-edit-nav').length).toBe(0);
+  });
+});

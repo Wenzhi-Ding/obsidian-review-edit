@@ -1,6 +1,8 @@
 import type { App, MarkdownView, Plugin, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
+import { EditorView } from '@codemirror/view';
 import { computeHunks, revertEditSpec, shiftAfterReject, type DiffHunk } from './diff-engine';
+import { DiffNav, adjustNavIndex } from './diff-nav';
 import type { SnapshotEntry } from './snapshot-source';
 import {
   READONLY_OFF,
@@ -10,7 +12,6 @@ import {
   setDiffHandlers,
   setHunksEffect,
 } from './cm-extension';
-import type { EditorView } from '@codemirror/view';
 
 interface Session {
   view: MarkdownView;
@@ -20,6 +21,9 @@ interface Session {
   savedViewState: Record<string, unknown> | null;
   /** enter 时的 CM 实例；与当前不一致则会话已失效 */
   cm: EditorView;
+  /** 差异导航条；索引只针对待处理块 */
+  nav: DiffNav;
+  navIndex: number;
 }
 
 export class DiffModeController {
@@ -41,7 +45,9 @@ export class DiffModeController {
     await this.forceSourceSubMode(view);
     const cm = (view.editor as any)?.cm as EditorView | undefined;
     if (!cm) return false;
-    this.session = { view, file, baseline, hunks, savedViewState, cm };
+    const nav = new DiffNav(() => this.stepNav(-1), () => this.stepNav(1));
+    nav.mount(cm.dom);
+    this.session = { view, file, baseline, hunks, savedViewState, cm, nav, navIndex: 0 };
     setDiffHandlers({
       onHunkAction: (id, action) => (action === 'keep' ? this.keep(id) : this.reject(id)),
       onExit: () => this.exit(),
@@ -54,6 +60,8 @@ export class DiffModeController {
       this.exit();
       return false;
     }
+    nav.update(this.pendingCount(), this.session.navIndex);
+    this.scrollToHunk(cm, hunks[0]);
     return true;
   }
 
@@ -86,7 +94,9 @@ export class DiffModeController {
       this.exit();
       return;
     }
-    this.session.hunks = this.session.hunks.map(h =>
+    const s = this.session;
+    const pendingIdsBefore = s.hunks.filter(h => h.status === 'pending').map(h => h.id);
+    this.session.hunks = s.hunks.map(h =>
       h.id === id ? { ...h, status: 'kept' as const } : h
     );
     try {
@@ -95,6 +105,7 @@ export class DiffModeController {
       this.exit();
       return;
     }
+    this.afterHunkResolved(pendingIdsBefore, id);
     this.exitIfAllResolved();
   }
 
@@ -107,6 +118,7 @@ export class DiffModeController {
     }
     const hunk = this.session.hunks.find(h => h.id === id);
     if (!hunk || hunk.status !== 'pending') return;
+    const pendingIdsBefore = this.session.hunks.filter(h => h.status === 'pending').map(h => h.id);
     const spec = revertEditSpec(cm.state.doc, hunk);
     this.session.hunks = shiftAfterReject(this.session.hunks, id);
     try {
@@ -118,7 +130,45 @@ export class DiffModeController {
       this.exit();
       return;
     }
+    this.afterHunkResolved(pendingIdsBefore, id);
     this.exitIfAllResolved();
+  }
+
+  /** 一个块处理完后：修正导航索引并刷新导航条计数 */
+  private afterHunkResolved(pendingIdsBefore: number[], resolvedId: number): void {
+    const s = this.session;
+    if (!s) return;
+    s.navIndex = adjustNavIndex(pendingIdsBefore, resolvedId, s.navIndex);
+    s.nav.update(this.pendingCount(), s.navIndex);
+  }
+
+  private pendingCount(): number {
+    return this.session?.hunks.filter(h => h.status === 'pending').length ?? 0;
+  }
+
+  /** 导航条按钮：移动当前差异块并滚动定位；到头/尾不动 */
+  private stepNav(dir: -1 | 1): void {
+    const s = this.session;
+    if (!s) return;
+    const pending = s.hunks.filter(h => h.status === 'pending');
+    if (pending.length === 0) return;
+    const next = Math.max(0, Math.min(s.navIndex + dir, pending.length - 1));
+    if (next === s.navIndex) return;
+    s.navIndex = next;
+    s.nav.update(pending.length, next);
+    const cm = this.liveCm();
+    if (cm) this.scrollToHunk(cm, pending[next]);
+  }
+
+  /** 滚动让差异块出现在编辑器垂直居中位置 */
+  private scrollToHunk(cm: EditorView, hunk: DiffHunk): void {
+    const doc = cm.state.doc;
+    const pos = hunk.currentFrom < doc.lines ? doc.line(hunk.currentFrom + 1).from : doc.length;
+    try {
+      cm.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+    } catch {
+      /* 视图异常时忽略滚动 */
+    }
   }
 
   private exitIfAllResolved(): void {
@@ -132,8 +182,9 @@ export class DiffModeController {
     const s = this.session;
     if (!s) return;
     this.session = null;
-    // 先清 handlers，保证后续 dispatch 抛错也不会残留失效回调
+    // 先清 handlers 与导航条，保证后续 dispatch 抛错也不会残留失效回调/界面
     setDiffHandlers(null);
+    s.nav.unmount();
     const cm = (s.view.editor as any)?.cm as EditorView | undefined;
     if (cm && cm === s.cm) {
       try {

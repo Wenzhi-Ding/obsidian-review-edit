@@ -83,9 +83,10 @@ function buildDecorations(state: EditorState): DecorationSet {
   const doc = state.doc;
   const ranges = [];
   for (const h of hunks) {
-    // 纯删除块落在文件末尾时 currentFrom 越界：锚定最后一行，side 取正值渲染在其下方
+    // 纯删除块落在文件末尾时 currentFrom 越界：锚点必须取 doc.length（文档末尾），
+    // 取 doc.line(doc.lines).from 会渲染在最后一行之前并让 CM6 多插一条幻影空行
     const atEof = h.currentFrom >= doc.lines;
-    const startPos = atEof ? doc.line(doc.lines).from : doc.line(h.currentFrom + 1).from;
+    const startPos = atEof ? doc.length : doc.line(h.currentFrom + 1).from;
     if (h.status === 'pending') {
       for (let i = h.currentFrom; i < h.currentTo && i < doc.lines; i++) {
         ranges.push(Decoration.line({ class: 'review-edit-line-added' }).range(doc.line(i + 1).from));

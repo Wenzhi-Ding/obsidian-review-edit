@@ -49,15 +49,33 @@ describe('diffExtension 在真实 EditorView 上的冒烟', () => {
     expect(v.dom.querySelectorAll('.review-edit-toolbar').length).toBe(1);
   });
 
-  it('文件末尾的纯删除块仍渲染红块与工具条', () => {
-    const v = mount('a\nb');
+  it.each([
+    ['无尾换行', 'a\nb'],
+    ['有尾换行', 'a\nb\n'],
+  ])('文件末尾的纯删除块渲染在最后一行之后且不产生幻影空行（%s）', (_name, docText) => {
+    const v = mount(docText);
+    const linesBefore = v.contentDOM.querySelectorAll('.cm-line').length;
+    const eofLine = v.state.doc.lines; // 越界一行 => 纯删除块落在文件末尾
     v.dispatch({
       effects: setHunksEffect.of([
-        hunk({ id: 0, type: 'removed', currentFrom: 2, currentTo: 2, baselineText: 'X', baselineLines: 1 }),
+        hunk({ id: 0, type: 'removed', currentFrom: eofLine, currentTo: eofLine, baselineText: 'X', baselineLines: 1 }),
       ]),
     });
     expect(v.dom.querySelectorAll('.review-edit-deleted').length).toBe(1);
     expect(v.dom.querySelectorAll('.review-edit-toolbar').length).toBe(1);
+    // 未新增幻影 cm-line
+    expect(v.contentDOM.querySelectorAll('.cm-line').length).toBe(linesBefore);
+    // 文档序：工具条与删除块都排在最后一条 cm-line 之后
+    const nodes = Array.from(v.contentDOM.children);
+    const lastLineIdx = nodes.map(n => n.classList.contains('cm-line')).lastIndexOf(true);
+    const toolbarIdx = nodes.findIndex(n => n.querySelector?.('.review-edit-toolbar') || n.classList.contains('review-edit-toolbar'));
+    const deletedIdx = nodes.findIndex(n => n.querySelector?.('.review-edit-deleted') || n.classList.contains('review-edit-deleted'));
+    expect(lastLineIdx).toBeGreaterThanOrEqual(0);
+    expect(toolbarIdx).toBeGreaterThan(lastLineIdx);
+    expect(deletedIdx).toBeGreaterThan(toolbarIdx);
+    // 文本顺序：删除内容 X 出现在最后一行文本 b 之后
+    const text = v.contentDOM.textContent ?? '';
+    expect(text.lastIndexOf('X')).toBeGreaterThan(text.lastIndexOf('b'));
   });
 
   it('模拟撤销：changes + setHunksEffect 同事务下发不抛错', () => {

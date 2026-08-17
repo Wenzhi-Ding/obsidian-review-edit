@@ -2,6 +2,8 @@
 
 Review the changes in a note against a historical snapshot, rendered as a git-style inline diff inside the Obsidian editor. Keep (✓) or revert (✕) each diff hunk individually. Snapshots come from the core **File Recovery** plugin — no git required. The interface language follows Obsidian's display language (English and Chinese are built in).
 
+![Review mode, English UI](docs/screenshots/review-en.png)
+
 ## Usage
 
 1. Make sure the core plugin **File Recovery** is enabled (Settings → Core plugins → File recovery; it is on by default).
@@ -45,6 +47,8 @@ Manual install into a vault: copy `main.js`, `styles.css`, and `manifest.json` i
 # 中文说明
 
 在 Obsidian 编辑器内以 git diff 风格审查一篇笔记相对历史快照的改动，逐块「保留 ✓」或「撤销 ✕」。基于核心插件「文件恢复」的快照，不依赖 git。界面语言跟随 Obsidian 显示语言（内置中英文）。
+
+![审查模式（中文界面）](docs/screenshots/review-zh.png)
 
 ## 使用
 

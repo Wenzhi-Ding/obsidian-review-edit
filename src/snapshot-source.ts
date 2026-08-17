@@ -1,4 +1,5 @@
 import type { App } from 'obsidian';
+import { sameContent } from './diff-engine';
 
 export interface SnapshotEntry {
   ts: number;
@@ -43,10 +44,11 @@ export async function getSnapshots(app: App, path: string): Promise<SnapshotEntr
 }
 
 /**
- * 剔除与当前内容完全相同的快照。
+ * 剔除与当前内容相同的快照。
  * Obsidian 不只在内容变化时落快照（如路径变动），候选列表里混入
  * 与当前一致的条目只会让用户选中后得到「没有发现差异」。
+ * 「相同」按 diff 引擎的标准（忽略行尾风格与末尾换行）。
  */
 export function filterDiffering(entries: SnapshotEntry[], current: string): SnapshotEntry[] {
-  return entries.filter(e => e.data !== current);
+  return entries.filter(e => !sameContent(e.data, current));
 }

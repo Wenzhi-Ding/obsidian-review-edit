@@ -71,4 +71,21 @@ describe('filterDiffering', () => {
   it('空列表原样返回', () => {
     expect(filterDiffering([], 'x')).toEqual([]);
   });
+
+  it('仅尾换行差异的快照视为相同内容并剔除', () => {
+    const entries = [
+      { ts: 300, data: 'a\nb\n' },
+      { ts: 200, data: 'a\nb' },
+      { ts: 100, data: 'a\nX\n' },
+    ];
+    expect(filterDiffering(entries, 'a\nb\n')).toEqual([{ ts: 100, data: 'a\nX\n' }]);
+  });
+
+  it('仅换行符风格（CRLF/LF）差异的快照视为相同内容并剔除', () => {
+    const entries = [
+      { ts: 300, data: 'a\r\nb\r\n' },
+      { ts: 200, data: 'a\nX\n' },
+    ];
+    expect(filterDiffering(entries, 'a\nb\n')).toEqual([{ ts: 200, data: 'a\nX\n' }]);
+  });
 });

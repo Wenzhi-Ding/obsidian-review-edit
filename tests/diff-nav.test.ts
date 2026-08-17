@@ -29,11 +29,12 @@ describe('DiffNav', () => {
   function mounted() {
     const onPrev = vi.fn();
     const onNext = vi.fn();
-    const nav = new DiffNav(onPrev, onNext);
+    const onExit = vi.fn();
+    const nav = new DiffNav(onPrev, onNext, onExit);
     const container = document.createElement('div');
     document.body.appendChild(container);
     nav.mount(container);
-    return { nav, container, onPrev, onNext };
+    return { nav, container, onPrev, onNext, onExit };
   }
 
   it('mount 在容器里加两个导航条（上/下）', () => {
@@ -42,6 +43,15 @@ describe('DiffNav', () => {
     expect(bars.length).toBe(2);
     expect(container.querySelector('.review-edit-nav-top')).not.toBeNull();
     expect(container.querySelector('.review-edit-nav-bottom')).not.toBeNull();
+  });
+
+  it('每个导航条都有退出按钮且点击触发 onExit', () => {
+    const { container, onExit } = mounted();
+    const exits = container.querySelectorAll('.review-edit-nav-exit');
+    expect(exits.length).toBe(2);
+    (exits[0] as HTMLElement).click();
+    (exits[1] as HTMLElement).click();
+    expect(onExit).toHaveBeenCalledTimes(2);
   });
 
   it('update 显示「差异 i/n」并在两端禁用对应按钮', () => {

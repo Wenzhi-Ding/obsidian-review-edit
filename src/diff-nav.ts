@@ -25,9 +25,9 @@ export function adjustNavIndex(
 }
 
 export class DiffNav {
-  private bars: { root: HTMLElement; prev: HTMLButtonElement; next: HTMLButtonElement; count: HTMLElement }[] = [];
+  private bars: { root: HTMLElement; prev: HTMLButtonElement; next: HTMLButtonElement; exit: HTMLButtonElement; count: HTMLElement }[] = [];
 
-  constructor(private onPrev: () => void, private onNext: () => void) {}
+  constructor(private onPrev: () => void, private onNext: () => void, private onExit: () => void) {}
 
   mount(container: HTMLElement): void {
     if (this.bars.length > 0) return;
@@ -50,11 +50,20 @@ export class DiffNav {
         e.preventDefault();
         this.onNext();
       };
+      const exit = document.createElement('button');
+      exit.className = 'review-edit-nav-btn review-edit-nav-exit';
+      exit.textContent = '退出';
+      exit.setAttribute('aria-label', '退出 diff 模式（未处理的改动全部保留）');
+      exit.onclick = (e) => {
+        e.preventDefault();
+        this.onExit();
+      };
       root.appendChild(prev);
       root.appendChild(count);
       root.appendChild(next);
+      root.appendChild(exit);
       container.appendChild(root);
-      this.bars.push({ root, prev, next, count });
+      this.bars.push({ root, prev, next, exit, count });
     }
   }
 

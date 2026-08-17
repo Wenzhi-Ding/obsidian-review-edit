@@ -45,7 +45,7 @@ export class DiffModeController {
     await this.forceSourceSubMode(view);
     const cm = (view.editor as any)?.cm as EditorView | undefined;
     if (!cm) return false;
-    const nav = new DiffNav(() => this.stepNav(-1), () => this.stepNav(1));
+    const nav = new DiffNav(() => this.stepNav(-1), () => this.stepNav(1), () => this.exit());
     nav.mount(cm.dom);
     this.session = { view, file, baseline, hunks, savedViewState, cm, nav, navIndex: 0 };
     setDiffHandlers({

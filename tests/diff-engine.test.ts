@@ -49,6 +49,22 @@ describe('computeHunks', () => {
     expect(computeHunks('a\nb', 'a\nb\n')).toEqual([]);
   });
 
+  it('CRLF 与 LF 混用不产生伪差异', () => {
+    expect(computeHunks('a\r\nb\r\n', 'a\nb\n')).toEqual([]);
+    expect(computeHunks('a\r\nb\r\nc\r\n', 'a\nb\nc')).toEqual([]);
+  });
+
+  it('CRLF 基准与 LF 当前内容只有真实改动行产生差异块', () => {
+    const baseline = '| 表头 |\r\n|---|\r\n| 旧行 |\r\n';
+    const current = '| 表头 |\n|---|\n| 新行 |\n';
+    const hunks = computeHunks(baseline, current);
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]).toMatchObject({
+      type: 'changed', currentFrom: 2, currentTo: 3,
+      currentText: '| 新行 |', baselineText: '| 旧行 |',
+    });
+  });
+
   it('新增一个空行：得 added 块（baselineLines 为 0）', () => {
     const hunks = computeHunks('a\nb', 'a\n\nb');
     expect(hunks).toHaveLength(1);
@@ -174,5 +190,13 @@ describe('revertEditSpec', () => {
       hunk({ type: 'added', currentFrom: 2, currentTo: 3, currentText: 'c' })
     );
     expect(apply('a\nb\nc\n', spec)).toBe('a\nb\n');
+  });
+
+  it('CRLF 基准撤销时插入 LF 文本（与编辑器一致）', () => {
+    const hunks = computeHunks('a\r\nX\r\nb\r\n', 'a\nb\n');
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0].baselineText).not.toContain('\r');
+    const spec = revertEditSpec(EditorState.create({ doc: 'a\nb\n' }).doc, hunks[0]);
+    expect(apply('a\nb\n', spec)).toBe('a\nX\nb\n');
   });
 });

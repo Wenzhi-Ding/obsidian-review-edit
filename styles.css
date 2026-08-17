@@ -81,6 +81,10 @@
   opacity: 0.4;
   cursor: default;
 }
+.review-edit-nav-exit {
+  margin-left: 4px;
+  color: var(--text-error);
+}
 .review-edit-nav-count {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);

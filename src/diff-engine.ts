@@ -29,8 +29,18 @@ const stripTrailingNewline = (v: string): string =>
 const normalizeEnding = (v: string): string =>
   v === '' || v.endsWith('\n') ? v : v + '\n';
 
+// 磁盘上可能是 CRLF（如 Zotero 导入），编辑器内部统一 LF；
+// 行尾风格差异不是内容差异，比较前统一剥掉 \r
+const normalizeText = (v: string): string =>
+  normalizeEnding(v.replace(/\r\n?/g, '\n'));
+
+/** 两段文本在忽略行尾风格与末尾换行后是否相同（与 computeHunks 的判空标准一致） */
+export function sameContent(a: string, b: string): boolean {
+  return normalizeText(a) === normalizeText(b);
+}
+
 export function computeHunks(baseline: string, current: string): DiffHunk[] {
-  const parts = diffLines(normalizeEnding(baseline), normalizeEnding(current));
+  const parts = diffLines(normalizeText(baseline), normalizeText(current));
   const hunks: DiffHunk[] = [];
   let line = 0;
   let id = 0;

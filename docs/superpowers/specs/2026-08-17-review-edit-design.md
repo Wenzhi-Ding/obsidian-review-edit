@@ -106,3 +106,10 @@ IndexedDB 事务的 promise 化返回值按 Time Machine 的处理方式兼容�
 - 另一 vault：`C:\Users\wenzh\Dropbox\Research\2024_ceo_ability_ml`。
 - 两个 vault 均启用 file-recovery，均非 git 仓库。
 - 插件代码仓库：`C:\Users\wenzh\Dropbox\Code\obsidian-git-diff`。
+
+## 11. v1.1 增补（2026-08-17 实施后）
+
+- 判等口径：忽略 CRLF/LF 行尾风格与末尾换行（`sameContent`/`normalizeText`），候选过滤与 diff 引擎共用同一判等函数。
+- 选择器过滤：与当前内容相同的快照不入候选列表；「与上一个快照对比」取过滤后最近一条。
+- diff 模式导航：编辑器右上/右下浮动导航条（上一处/下一处/差异 i/n/退出），只剩一处时按钮用于重新定位，进入时自动定位首个差异，全部处理完自动退出。
+- 编辑器头部右上角增加「历史比对」按钮（时钟图标），点击打开快照选择器。

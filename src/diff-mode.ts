@@ -1,7 +1,7 @@
 import type { App, MarkdownView, Plugin, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
-import { computeHunks, revertEditSpec, shiftAfterReject, type DiffHunk } from './diff-engine';
+import { computeHunks, revertEditSpec, sameContent, shiftAfterReject, type DiffHunk } from './diff-engine';
 import { DiffNav, adjustNavIndex } from './diff-nav';
 import type { SnapshotEntry } from './snapshot-source';
 import {
@@ -215,7 +215,7 @@ export class DiffModeController {
     if (!s || s !== expected) return;
     try {
       const disk = await this.app.vault.cachedRead(s.file);
-      if (disk !== s.view.editor.getValue()) {
+      if (!sameContent(disk, s.view.editor.getValue())) {
         new Notice('文件被外部修改，已退出 diff 模式');
         this.exit();
       }

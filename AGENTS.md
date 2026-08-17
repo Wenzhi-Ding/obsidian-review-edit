@@ -12,3 +12,4 @@ Session evidence: 2026-08-17 filterDiffering 首版裸比较与引擎归一化�
 - `manifest.json` 的 `description` 只写英文（社区市场面向国际用户）。官方风格要求：≤250 字符、动词开头、句号结尾、无 emoji、不以 "This is a plugin" 起头。
 - README 英文部分不混中文；中文内容集中在文末「中文说明」章节。
 - 用户可见的界面文字一律放 `src/strings.ts`，新增条目同时补 zh/en 两套，不在组件里硬编码单一语言。
+- `manifest.json` 任何字段改动推送到 main 后，必须 bump 版本并发新 release（`npm version patch` → 推 tag → 发布 Actions 建的 draft）——社区审核扫描的是 release 资产里的 manifest.json，不是仓库文件；只改仓库不重发，旧资产会继续被打回。

@@ -59,6 +59,15 @@ describe('DiffNav', () => {
     expect(next.disabled).toBe(true);
   });
 
+  it('只剩一处待处理时两个按钮都不置灰（用于重新定位）', () => {
+    const { nav, container } = mounted();
+    nav.update(1, 0);
+    const [prev, next] = Array.from(container.querySelectorAll('.review-edit-nav-bottom .review-edit-nav-btn')) as HTMLButtonElement[];
+    expect(prev.disabled).toBe(false);
+    expect(next.disabled).toBe(false);
+    expect(container.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 1/1');
+  });
+
   it('上下两个导航条内容一致', () => {
     const { nav, container } = mounted();
     nav.update(3, 1);

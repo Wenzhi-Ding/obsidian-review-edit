@@ -146,18 +146,20 @@ export class DiffModeController {
     return this.session?.hunks.filter(h => h.status === 'pending').length ?? 0;
   }
 
-  /** 导航条按钮：移动当前差异块并滚动定位；到头/尾不动 */
+  /** 导航条按钮：移动当前差异块并滚动定位；只剩一处或已在边界时仍重新滚动到当前块 */
   private stepNav(dir: -1 | 1): void {
     const s = this.session;
     if (!s) return;
     const pending = s.hunks.filter(h => h.status === 'pending');
     if (pending.length === 0) return;
     const next = Math.max(0, Math.min(s.navIndex + dir, pending.length - 1));
-    if (next === s.navIndex) return;
-    s.navIndex = next;
-    s.nav.update(pending.length, next);
+    if (next !== s.navIndex) {
+      s.navIndex = next;
+      s.nav.update(pending.length, next);
+    }
     const cm = this.liveCm();
-    if (cm) this.scrollToHunk(cm, pending[next]);
+    const target = pending[Math.min(s.navIndex, pending.length - 1)];
+    if (cm && target) this.scrollToHunk(cm, target);
   }
 
   /** 滚动让差异块出现在编辑器垂直居中位置 */

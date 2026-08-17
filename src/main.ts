@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin } from 'obsidian';
+import { MarkdownView, Notice, Plugin, setIcon } from 'obsidian';
 import type { TFile } from 'obsidian';
 import { diffExtension, readonlyCompartment } from './cm-extension';
 import { DiffModeController } from './diff-mode';
@@ -18,6 +18,11 @@ export default class ReviewEditPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => this.diffMode.handleLeafChange())
     );
+    // 每个打开的笔记视图右上角加一个「历史比对」按钮；视图关闭时随 DOM 销毁
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => this.ensureHeaderButtons())
+    );
+    this.app.workspace.onLayoutReady(() => this.ensureHeaderButtons());
 
     this.addCommand({
       id: 'compare-snapshot',
@@ -39,6 +44,23 @@ export default class ReviewEditPlugin extends Plugin {
 
   onunload() {
     this.diffMode.exit();
+  }
+
+  /** 幂等地给所有 Markdown 视图头部的按钮区加历史比对按钮 */
+  private ensureHeaderButtons() {
+    this.app.workspace.iterateAllLeaves(leaf => {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) return;
+      const actions = view.containerEl.querySelector('.view-actions');
+      if (!actions || actions.querySelector('.review-edit-header-btn')) return;
+      const btn = document.createElement('div');
+      btn.className = 'clickable-icon review-edit-header-btn';
+      btn.setAttribute('aria-label', '与历史版本对比');
+      btn.setAttribute('aria-label-position', 'left');
+      setIcon(btn, 'history');
+      btn.onclick = () => void this.startReview(false);
+      actions.prepend(btn);
+    });
   }
 
   private async startReview(useLatest: boolean) {

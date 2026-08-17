@@ -65,8 +65,9 @@ export class DiffNav {
     const label = `差异 ${shown}/${n}`;
     for (const b of this.bars) {
       b.count.textContent = label;
-      b.prev.disabled = pendingCount === 0 || current <= 0;
-      b.next.disabled = pendingCount === 0 || current >= pendingCount - 1;
+      // 只剩一处时不置灰：点击任一按钮即重新定位到它（滚动可能已离开）
+      b.prev.disabled = pendingCount > 1 && current <= 0;
+      b.next.disabled = pendingCount > 1 && current >= pendingCount - 1;
     }
   }
 

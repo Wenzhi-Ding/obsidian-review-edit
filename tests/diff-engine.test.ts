@@ -12,7 +12,7 @@ describe('computeHunks', () => {
     expect(hunks).toHaveLength(1);
     expect(hunks[0]).toMatchObject({
       id: 0, status: 'pending', type: 'added',
-      currentFrom: 1, currentTo: 2, currentText: 'X', baselineText: ''
+      currentFrom: 1, currentTo: 2, currentText: 'X', baselineText: '', baselineLines: 0
     });
   });
 
@@ -20,7 +20,7 @@ describe('computeHunks', () => {
     const hunks = computeHunks('a\nX\nb', 'a\nb');
     expect(hunks).toHaveLength(1);
     expect(hunks[0]).toMatchObject({
-      type: 'removed', currentFrom: 1, currentTo: 1, currentText: '', baselineText: 'X'
+      type: 'removed', currentFrom: 1, currentTo: 1, currentText: '', baselineText: 'X', baselineLines: 1
     });
   });
 
@@ -28,7 +28,7 @@ describe('computeHunks', () => {
     const hunks = computeHunks('a\nb\nc', 'a\nB\nc');
     expect(hunks).toHaveLength(1);
     expect(hunks[0]).toMatchObject({
-      type: 'changed', currentFrom: 1, currentTo: 2, currentText: 'B', baselineText: 'b'
+      type: 'changed', currentFrom: 1, currentTo: 2, currentText: 'B', baselineText: 'b', baselineLines: 1
     });
   });
 
@@ -48,13 +48,35 @@ describe('computeHunks', () => {
   it('仅尾部换行差异不产生差异块', () => {
     expect(computeHunks('a\nb', 'a\nb\n')).toEqual([]);
   });
+
+  it('新增一个空行：得 added 块（baselineLines 为 0）', () => {
+    const hunks = computeHunks('a\nb', 'a\n\nb');
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]).toMatchObject({
+      type: 'added', currentFrom: 1, currentTo: 2, currentText: '', baselineText: '', baselineLines: 0,
+    });
+  });
+
+  it('删除一个空行：得 removed 块且 baselineLines 为 1', () => {
+    const hunks = computeHunks('a\n\nb', 'a\nb');
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0]).toMatchObject({
+      type: 'removed', currentFrom: 1, currentTo: 1, currentText: '', baselineText: '', baselineLines: 1,
+    });
+  });
 });
 
-const hunk = (over: Partial<DiffHunk>): DiffHunk => ({
-  id: 0, status: 'pending', type: 'changed',
-  currentFrom: 0, currentTo: 0, currentText: '', baselineText: '',
-  ...over,
-});
+// baselineLines 未显式给出时由 baselineText 推导（空串 = 无删除）；空行场景需显式传入
+const hunk = (over: Partial<DiffHunk>): DiffHunk => {
+  const base: DiffHunk = {
+    id: 0, status: 'pending', type: 'changed',
+    currentFrom: 0, currentTo: 0, currentText: '', baselineText: '', baselineLines: 0,
+    ...over,
+  };
+  return over.baselineLines === undefined
+    ? { ...base, baselineLines: base.baselineText === '' ? 0 : base.baselineText.split('\n').length }
+    : base;
+};
 
 const apply = (docText: string, spec: { from: number; to: number; insert: string }): string =>
   EditorState.create({ doc: docText }).update({ changes: spec }).state.doc.toString();
@@ -132,6 +154,18 @@ describe('revertEditSpec', () => {
       hunk({ type: 'changed', currentFrom: 1, currentTo: 2, baselineText: 'b' })
     );
     expect(apply('a\nB\n', spec)).toBe('a\nb\n');
+  });
+
+  it('基准侧为空行的修改块：全部撤销后还原空行', () => {
+    const baseline = 'a\n\nb';
+    const current = 'a\nX\nb';
+    const hunks = computeHunks(baseline, current);
+    expect(hunks).toHaveLength(1);
+    let doc = EditorState.create({ doc: current }).doc;
+    for (const h of hunks) {
+      doc = EditorState.create({ doc }).update({ changes: revertEditSpec(doc, h) }).state.doc;
+    }
+    expect(doc.toString()).toBe(baseline);
   });
 
   it('末尾新增块撤销（文档有尾换行）', () => {

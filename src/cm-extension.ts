@@ -77,24 +77,29 @@ class ToolbarWidget extends WidgetType {
   }
 }
 
-function buildDecorations(view: EditorView): DecorationSet {
-  const hunks = view.state.field(diffHunkField);
+function buildDecorations(state: EditorState): DecorationSet {
+  const hunks = state.field(diffHunkField);
   if (!hunks) return Decoration.none;
-  const doc = view.state.doc;
+  const doc = state.doc;
   const ranges = [];
   for (const h of hunks) {
-    if (h.currentFrom >= doc.lines) continue; // 行号已越界，跳过防护
-    const startPos = doc.line(h.currentFrom + 1).from;
+    // 纯删除块落在文件末尾时 currentFrom 越界：锚定最后一行，side 取正值渲染在其下方
+    const atEof = h.currentFrom >= doc.lines;
+    const startPos = atEof ? doc.line(doc.lines).from : doc.line(h.currentFrom + 1).from;
     if (h.status === 'pending') {
       for (let i = h.currentFrom; i < h.currentTo && i < doc.lines; i++) {
         ranges.push(Decoration.line({ class: 'review-edit-line-added' }).range(doc.line(i + 1).from));
       }
       ranges.push(
-        Decoration.widget({ widget: new ToolbarWidget(h.id), block: true, side: -1000 }).range(startPos)
+        Decoration.widget({ widget: new ToolbarWidget(h.id), block: true, side: atEof ? 999 : -1000 }).range(startPos)
       );
-      if (h.baselineText !== '') {
+      if (h.baselineLines > 0) {
         ranges.push(
-          Decoration.widget({ widget: new DeletedLinesWidget(h.baselineText), block: true, side: -999 }).range(startPos)
+          Decoration.widget({
+            widget: new DeletedLinesWidget(h.baselineText),
+            block: true,
+            side: atEof ? 1000 : -999,
+          }).range(startPos)
         );
       }
     } else {
@@ -106,13 +111,23 @@ function buildDecorations(view: EditorView): DecorationSet {
   return Decoration.set(ranges, true);
 }
 
+// 块级装饰不允许由动态 decorations 输入（plugin/函数）提供，CM6 会抛
+// RangeError: Block decorations may not be specified via plugins，故必须走 StateField。
+const diffDecorationField = StateField.define<DecorationSet>({
+  create: (state) => buildDecorations(state),
+  update: (value, tr) =>
+    tr.docChanged || tr.effects.some((e) => e.is(setHunksEffect)) ? buildDecorations(tr.state) : value,
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 export const readonlyCompartment = new Compartment();
 export const READONLY_ON: Extension = [EditorState.readOnly.of(true), EditorView.editable.of(false)];
 export const READONLY_OFF: Extension = [];
 
 export const diffExtension: Extension = [
+  // diffDecorationField 必须列在 diffHunkField 之后：update 时要读 tr.state.field(diffHunkField)
   diffHunkField,
-  EditorView.decorations.of((view) => buildDecorations(view)),
+  diffDecorationField,
   keymap.of([
     {
       key: 'Escape',

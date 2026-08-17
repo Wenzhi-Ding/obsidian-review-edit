@@ -71,8 +71,13 @@ export default class ReviewEditPlugin extends Plugin {
       }
       if (!(await this.diffMode.enter(view, first))) new Notice('没有发现差异');
     } else {
+      // onChoose 是裸调用，未捕获的 rejection 会逃逸成 unhandled rejection
       new SnapshotPickerModal(this.app, view.file, entries, async e => {
-        if (!(await this.diffMode.enter(view, e))) new Notice('没有发现差异');
+        try {
+          if (!(await this.diffMode.enter(view, e))) new Notice('没有发现差异');
+        } catch {
+          new Notice('进入 diff 模式失败');
+        }
       }).open();
     }
   }

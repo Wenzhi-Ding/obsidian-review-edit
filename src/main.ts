@@ -2,7 +2,7 @@ import { MarkdownView, Notice, Plugin, setIcon } from 'obsidian';
 import type { TFile } from 'obsidian';
 import { diffExtension, readonlyCompartment } from './cm-extension';
 import { DiffModeController } from './diff-mode';
-import { getSnapshots, SnapshotSourceUnavailableError } from './snapshot-source';
+import { getSnapshots, filterDiffering, SnapshotSourceUnavailableError } from './snapshot-source';
 import { SnapshotPickerModal } from './snapshot-picker';
 
 export default class ReviewEditPlugin extends Plugin {
@@ -73,25 +73,25 @@ export default class ReviewEditPlugin extends Plugin {
       new Notice('请在编辑模式（而非阅读模式）下使用');
       return;
     }
-    let entries;
+    let rawEntries;
     try {
-      entries = await getSnapshots(this.app, view.file.path);
+      rawEntries = await getSnapshots(this.app, view.file.path);
     } catch (e) {
       new Notice(e instanceof SnapshotSourceUnavailableError ? '文件恢复插件未启用或快照数据库不可读' : '读取快照失败');
       return;
     }
-    if (entries.length === 0) {
+    if (rawEntries.length === 0) {
       new Notice('该文件没有可用的历史快照');
       return;
     }
-    const current = view.editor.getValue();
+    // 候选列表只留与当前内容不同的快照（Obsidian 落快照不一定伴随内容变化）
+    const entries = filterDiffering(rawEntries, view.editor.getValue());
+    if (entries.length === 0) {
+      new Notice('没有发现差异');
+      return;
+    }
     if (useLatest) {
-      const first = entries.find(e => e.data !== current);
-      if (!first) {
-        new Notice('没有发现差异');
-        return;
-      }
-      if (!(await this.diffMode.enter(view, first))) new Notice('没有发现差异');
+      if (!(await this.diffMode.enter(view, entries[0]))) new Notice('没有发现差异');
     } else {
       // onChoose 是裸调用，未捕获的 rejection 会逃逸成 unhandled rejection
       new SnapshotPickerModal(this.app, view.file, entries, async e => {

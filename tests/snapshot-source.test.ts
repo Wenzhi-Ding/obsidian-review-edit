@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSnapshots, SnapshotSourceUnavailableError } from '../src/snapshot-source';
+import { filterDiffering, getSnapshots, SnapshotSourceUnavailableError } from '../src/snapshot-source';
 
 function mockDb(records: Array<{ path: string; ts: number; data: string }>, withPathIndex = true) {
   return {
@@ -47,5 +47,28 @@ describe('getSnapshots', () => {
   it('IndexedDB 抛错时原样向上抛出', async () => {
     const db = { transaction: () => { throw new Error('boom'); } };
     await expect(getSnapshots(mockApp(db), 'a.md')).rejects.toThrow('boom');
+  });
+});
+
+describe('filterDiffering', () => {
+  it('剔除与当前内容相同的快照，保持时间倒序不变', () => {
+    const entries = [
+      { ts: 300, data: 'current' },
+      { ts: 200, data: 'v2' },
+      { ts: 100, data: 'current' },
+      { ts: 50, data: 'v1' },
+    ];
+    expect(filterDiffering(entries, 'current')).toEqual([
+      { ts: 200, data: 'v2' },
+      { ts: 50, data: 'v1' },
+    ]);
+  });
+
+  it('全部相同时返回空数组', () => {
+    expect(filterDiffering([{ ts: 1, data: 'same' }], 'same')).toEqual([]);
+  });
+
+  it('空列表原样返回', () => {
+    expect(filterDiffering([], 'x')).toEqual([]);
   });
 });

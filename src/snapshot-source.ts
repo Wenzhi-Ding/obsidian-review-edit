@@ -41,3 +41,12 @@ export async function getSnapshots(app: App, path: string): Promise<SnapshotEntr
   }
   return out;
 }
+
+/**
+ * 剔除与当前内容完全相同的快照。
+ * Obsidian 不只在内容变化时落快照（如路径变动），候选列表里混入
+ * 与当前一致的条目只会让用户选中后得到「没有发现差异」。
+ */
+export function filterDiffering(entries: SnapshotEntry[], current: string): SnapshotEntry[] {
+  return entries.filter(e => e.data !== current);
+}

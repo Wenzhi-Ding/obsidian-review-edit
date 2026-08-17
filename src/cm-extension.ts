@@ -33,12 +33,9 @@ class DeletedLinesWidget extends WidgetType {
     return other.text === this.text;
   }
   toDOM() {
-    const wrap = document.createElement('div');
-    wrap.className = 'review-edit-deleted';
+    const wrap = createDiv({ cls: 'review-edit-deleted' });
     for (const line of this.text.split('\n')) {
-      const div = document.createElement('div');
-      div.textContent = line === '' ? '\u00A0' : line;
-      wrap.appendChild(div);
+      wrap.appendChild(createDiv({ text: line === '' ? '\u00A0' : line }));
     }
     return wrap;
   }
@@ -52,18 +49,13 @@ class ToolbarWidget extends WidgetType {
     return other.hunkId === this.hunkId;
   }
   toDOM() {
-    const wrap = document.createElement('div');
-    wrap.className = 'review-edit-toolbar';
-    const keep = document.createElement('button');
-    keep.className = 'review-edit-btn keep';
-    keep.textContent = '保留 ✓';
+    const wrap = createDiv({ cls: 'review-edit-toolbar' });
+    const keep = createEl('button', { cls: 'review-edit-btn keep', text: '保留 ✓' });
     keep.onclick = (e) => {
       e.preventDefault();
       handlers?.onHunkAction(this.hunkId, 'keep');
     };
-    const reject = document.createElement('button');
-    reject.className = 'review-edit-btn reject';
-    reject.textContent = '撤销 ✕';
+    const reject = createEl('button', { cls: 'review-edit-btn reject', text: '撤销 ✕' });
     reject.onclick = (e) => {
       e.preventDefault();
       handlers?.onHunkAction(this.hunkId, 'reject');

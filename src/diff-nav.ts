@@ -32,27 +32,19 @@ export class DiffNav {
   mount(container: HTMLElement): void {
     if (this.bars.length > 0) return;
     for (const pos of ['top', 'bottom'] as const) {
-      const root = document.createElement('div');
-      root.className = `review-edit-nav review-edit-nav-${pos}`;
-      const prev = document.createElement('button');
-      prev.className = 'review-edit-nav-btn';
-      prev.textContent = '‹ 上一处';
+      const root = createDiv({ cls: `review-edit-nav review-edit-nav-${pos}` });
+      const prev = createEl('button', { cls: 'review-edit-nav-btn', text: '‹ 上一处' });
       prev.onclick = (e) => {
         e.preventDefault();
         this.onPrev();
       };
-      const count = document.createElement('span');
-      count.className = 'review-edit-nav-count';
-      const next = document.createElement('button');
-      next.className = 'review-edit-nav-btn';
-      next.textContent = '下一处 ›';
+      const count = createSpan({ cls: 'review-edit-nav-count' });
+      const next = createEl('button', { cls: 'review-edit-nav-btn', text: '下一处 ›' });
       next.onclick = (e) => {
         e.preventDefault();
         this.onNext();
       };
-      const exit = document.createElement('button');
-      exit.className = 'review-edit-nav-btn review-edit-nav-exit';
-      exit.textContent = '退出';
+      const exit = createEl('button', { cls: 'review-edit-nav-btn review-edit-nav-exit', text: '退出' });
       exit.setAttribute('aria-label', '退出 diff 模式（未处理的改动全部保留）');
       exit.onclick = (e) => {
         e.preventDefault();

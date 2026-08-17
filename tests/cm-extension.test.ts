@@ -20,7 +20,7 @@ const hunk = (over: Partial<DiffHunk>): DiffHunk => ({
 let view: EditorView | null = null;
 
 function mount(doc: string): EditorView {
-  const parent = document.createElement('div');
+  const parent = createDiv();
   document.body.appendChild(parent);
   view = new EditorView({
     state: EditorState.create({ doc, extensions: [diffExtension, readonlyCompartment.of([])] }),

@@ -31,7 +31,7 @@ describe('DiffNav', () => {
     const onNext = vi.fn();
     const onExit = vi.fn();
     const nav = new DiffNav(onPrev, onNext, onExit);
-    const container = document.createElement('div');
+    const container = createDiv();
     document.body.appendChild(container);
     nav.mount(container);
     return { nav, container, onPrev, onNext, onExit };
@@ -62,7 +62,7 @@ describe('DiffNav', () => {
     expect((top.querySelector('.review-edit-nav-btn') as HTMLButtonElement).disabled).toBe(true);
     nav.update(5, 2);
     expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 3/5');
-    const [prev, next] = Array.from(top.querySelectorAll('.review-edit-nav-btn')) as HTMLButtonElement[];
+    const [prev, next] = Array.from(top.querySelectorAll<HTMLButtonElement>('.review-edit-nav-btn'));
     expect(prev.disabled).toBe(false);
     expect(next.disabled).toBe(false);
     nav.update(5, 4);
@@ -72,7 +72,7 @@ describe('DiffNav', () => {
   it('只剩一处待处理时两个按钮都不置灰（用于重新定位）', () => {
     const { nav, container } = mounted();
     nav.update(1, 0);
-    const [prev, next] = Array.from(container.querySelectorAll('.review-edit-nav-bottom .review-edit-nav-btn')) as HTMLButtonElement[];
+    const [prev, next] = Array.from(container.querySelectorAll<HTMLButtonElement>('.review-edit-nav-bottom .review-edit-nav-btn'));
     expect(prev.disabled).toBe(false);
     expect(next.disabled).toBe(false);
     expect(container.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 1/1');
@@ -88,7 +88,7 @@ describe('DiffNav', () => {
   it('点击按钮触发回调', () => {
     const { nav, container, onPrev, onNext } = mounted();
     nav.update(3, 1);
-    const [prev, next] = Array.from(container.querySelectorAll('.review-edit-nav-bottom .review-edit-nav-btn')) as HTMLButtonElement[];
+    const [prev, next] = Array.from(container.querySelectorAll<HTMLButtonElement>('.review-edit-nav-bottom .review-edit-nav-btn'));
     prev.click();
     expect(onPrev).toHaveBeenCalledTimes(1);
     next.click();

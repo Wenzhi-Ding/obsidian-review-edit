@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { App } from 'obsidian';
 import { filterDiffering, getSnapshots, SnapshotSourceUnavailableError } from '../src/snapshot-source';
 
 function mockDb(records: Array<{ path: string; ts: number; data: string }>, withPathIndex = true) {
@@ -13,17 +14,17 @@ function mockDb(records: Array<{ path: string; ts: number; data: string }>, with
   };
 }
 
-function mockApp(db: unknown) {
+function mockApp(db: unknown): App {
   return {
     internalPlugins: {
       getEnabledPluginById: (id: string) => (id === 'file-recovery' ? { db } : null),
     },
-  } as any;
+  } as unknown as App;
 }
 
 describe('getSnapshots', () => {
   it('file-recovery 不可用时抛 SnapshotSourceUnavailableError', async () => {
-    const app = { internalPlugins: { getEnabledPluginById: () => null } } as any;
+    const app = { internalPlugins: { getEnabledPluginById: () => null } } as unknown as App;
     await expect(getSnapshots(app, 'x.md')).rejects.toBeInstanceOf(SnapshotSourceUnavailableError);
   });
 

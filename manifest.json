@@ -3,7 +3,8 @@
   "name": "Review Edit",
   "version": "1.0.0",
   "minAppVersion": "1.5.0",
-  "description": "在编辑器内以 diff 形式审查笔记改动，逐块保留或撤销（基于文件恢复快照）",
-  "author": "wenzh",
+  "description": "Review note changes against File Recovery snapshots as an inline diff, then keep or revert each hunk.（基于文件恢复快照的 diff 式改动审查，逐块保留或撤销）",
+  "author": "Wenzhi Ding",
+  "authorUrl": "https://github.com/REPLACE-WITH-YOUR-GITHUB-USERNAME",
   "isDesktopOnly": false
 }

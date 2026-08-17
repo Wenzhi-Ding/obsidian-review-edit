@@ -1,5 +1,48 @@
 # Review Edit
 
+Review the changes in a note against a historical snapshot, rendered as a git-style inline diff inside the Obsidian editor. Keep (✓) or revert (✕) each diff hunk individually. Snapshots come from the core **File Recovery** plugin — no git required.
+
+## Usage
+
+1. Make sure the core plugin **File Recovery** is enabled (Settings → Core plugins → File recovery; it is on by default).
+2. Edit a note. Snapshots are taken automatically every snapshot interval (5 minutes by default).
+3. Start a review from any of the three entry points: the history button (clock icon) at the top right of the editor, the ribbon icon on the left sidebar, or the command **“与历史版本对比” (Compare with history version)** to pick a baseline snapshot. The command **“与上一个快照对比” (Compare with previous snapshot)** skips the picker and diffs against the most recent differing snapshot.
+4. Green lines were added since the baseline; red blocks are old content that was removed.
+5. A navigation bar **“‹ 上一处 | 差异 i/n | 下一处 ›”** appears at the top right and bottom right of the editor. *n* is the number of pending hunks; the buttons jump between hunks, and entering review mode scrolls to the first hunk.
+6. **Keep ✓** keeps the current text. **Revert ✕** restores the old text for that hunk, and the counter decreases. When every hunk is handled, review mode exits automatically. The navigation bar also has an exit button (or press `Esc`) — unhandled changes are all kept.
+
+## Known limitations
+
+- Snapshots lag behind your edits by up to one snapshot interval (5 minutes by default), and only the last 7 days are retained. Both can be changed in the File Recovery settings.
+- The snapshot picker only lists snapshots that differ from the current content. Obsidian sometimes stores snapshots without content changes (e.g. when a file is renamed); those entries are hidden automatically.
+- The editor is read-only while in diff mode; if the file is modified externally, the mode exits automatically.
+- A note that has never been edited has no snapshots to compare against.
+
+## Compatibility
+
+Reading snapshots relies on the internal IndexedDB structure of the File Recovery core plugin (the same approach as the Time Machine community plugin). There is no public API for this. If an Obsidian update breaks it, only `src/snapshot-source.ts` needs to be adapted.
+
+## Development
+
+```bash
+npm install
+npm run dev        # watch build
+npm test           # vitest unit tests
+npm run build      # production main.js
+npm run lint       # eslint (includes obsidianmd plugin guidelines)
+```
+
+Manual install into a vault: copy `main.js`, `styles.css`, and `manifest.json` into `<vault>/.obsidian/plugins/review-edit/`.
+
+## Releasing
+
+1. Run `npm version patch` (or `minor`/`major`) — this bumps `package.json` and, via `version-bump.mjs`, syncs `manifest.json` and `versions.json`.
+2. Push the commit and the tag. The tag must be the exact version number **without** a `v` prefix (e.g. `1.0.1`). The `.github/workflows/release.yml` workflow builds the plugin and creates a draft GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. Publish the draft.
+
+---
+
+# 中文说明
+
 在 Obsidian 编辑器内以 git diff 风格审查一篇笔记相对历史快照的改动，逐块「保留 ✓」或「撤销 ✕」。基于核心插件「文件恢复」的快照，不依赖 git。
 
 ## 使用

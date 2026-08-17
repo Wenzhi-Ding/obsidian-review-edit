@@ -1,4 +1,4 @@
-import type { App, MarkdownView, Plugin, TFile } from 'obsidian';
+import type { App, Editor, MarkdownView, Plugin, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { computeHunks, revertEditSpec, sameContent, shiftAfterReject, type DiffHunk } from './diff-engine';
@@ -26,6 +26,11 @@ interface Session {
   navIndex: number;
 }
 
+/** editor.cm 是公开的运行时属性但类型包未声明，这里集中做一次非 any 的取值 */
+function cmOf(view: MarkdownView): EditorView | undefined {
+  return (view.editor as Editor & { cm?: EditorView }).cm;
+}
+
 export class DiffModeController {
   private session: Session | null = null;
 
@@ -41,9 +46,9 @@ export class DiffModeController {
     if (!file) return false;
     const hunks = computeHunks(baseline.data, view.editor.getValue());
     if (hunks.length === 0) return false;
-    const savedViewState = view.getState() as Record<string, unknown>;
+    const savedViewState = view.getState();
     await this.forceSourceSubMode(view);
-    const cm = (view.editor as any)?.cm as EditorView | undefined;
+    const cm = cmOf(view);
     if (!cm) return false;
     const nav = new DiffNav(() => this.stepNav(-1), () => this.stepNav(1), () => this.exit());
     nav.mount(cm.dom);
@@ -69,13 +74,14 @@ export class DiffModeController {
     // 实时预览（source: false）下装饰也能渲染，但统一切到源码模式显示最稳
     const state = view.getState() as { mode?: string; source?: boolean | null };
     if (state.mode === 'source' && state.source === false) {
-      await view.setState({ ...state, source: true } as any, { history: false });
+      await view.setState({ ...state, source: true }, { history: false });
     }
   }
 
   private async restoreMode(view: MarkdownView, saved: Record<string, unknown> | null) {
-    if (saved && (saved as any).mode === 'source' && (saved as any).source === false) {
-      await view.setState(saved as any, { history: false });
+    const prev = saved as { mode?: string; source?: boolean | null } | null;
+    if (prev && prev.mode === 'source' && prev.source === false) {
+      await view.setState(saved, { history: false });
     }
   }
 
@@ -83,7 +89,7 @@ export class DiffModeController {
   private liveCm(): EditorView | null {
     const s = this.session;
     if (!s) return null;
-    const cm = (s.view.editor as any)?.cm as EditorView | undefined;
+    const cm = cmOf(s.view);
     return cm && cm === s.cm ? cm : null;
   }
 
@@ -187,7 +193,7 @@ export class DiffModeController {
     // 先清 handlers 与导航条，保证后续 dispatch 抛错也不会残留失效回调/界面
     setDiffHandlers(null);
     s.nav.unmount();
-    const cm = (s.view.editor as any)?.cm as EditorView | undefined;
+    const cm = cmOf(s.view);
     if (cm && cm === s.cm) {
       try {
         if (cm.state.field(diffHunkField, false)) {

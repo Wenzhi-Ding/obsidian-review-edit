@@ -19,18 +19,39 @@ interface FileRecoveryBackup {
   data: string;
 }
 
+/**
+ * 以下为 file-recovery 核心插件的内部结构（无公开类型，Time Machine 插件采用同一做法）：
+ * db 事务返回 Promise 化的 IDB 结果（与 Time Machine 插件相同处理），事务失败时 reject。
+ */
+interface SnapshotStore {
+  indexNames: { contains(name: string): boolean };
+  index(name: string): { getAll(key: string): Promise<FileRecoveryBackup[]> };
+  getAll(): Promise<FileRecoveryBackup[]>;
+}
+
+interface FileRecoveryPlugin {
+  db: {
+    transaction(stores: string, mode: 'readonly'): { objectStore(name: string): SnapshotStore };
+  };
+}
+
+interface InternalPlugins {
+  getEnabledPluginById?(id: string): FileRecoveryPlugin | undefined;
+}
+
+type AppWithInternalPlugins = App & { internalPlugins?: InternalPlugins };
+
 export async function getSnapshots(app: App, path: string): Promise<SnapshotEntry[]> {
-  const plugin = (app as any).internalPlugins?.getEnabledPluginById?.('file-recovery');
+  const plugin = (app as AppWithInternalPlugins).internalPlugins?.getEnabledPluginById?.('file-recovery');
   if (!plugin?.db) throw new SnapshotSourceUnavailableError();
 
-  // file-recovery 的 db 事务返回 Promise 化的 IDB 结果（与 Time Machine 插件相同处理）
   const tx = plugin.db.transaction('backups', 'readonly');
   const store = tx.objectStore('backups');
   let backups: FileRecoveryBackup[];
   if (store.indexNames.contains('path')) {
-    backups = (await store.index('path').getAll(path)) as FileRecoveryBackup[];
+    backups = await store.index('path').getAll(path);
   } else {
-    const all = (await store.getAll()) as FileRecoveryBackup[];
+    const all = await store.getAll();
     backups = all.filter(b => b.path === path);
   }
 

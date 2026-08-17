@@ -1,5 +1,4 @@
-import { MarkdownView, Notice, Plugin, setIcon } from 'obsidian';
-import type { TFile } from 'obsidian';
+import { MarkdownView, Notice, Plugin, setIcon, TFile } from 'obsidian';
 import { diffExtension, readonlyCompartment } from './cm-extension';
 import { DiffModeController } from './diff-mode';
 import { getSnapshots, filterDiffering, SnapshotSourceUnavailableError } from './snapshot-source';
@@ -13,7 +12,9 @@ export default class ReviewEditPlugin extends Plugin {
     this.registerEditorExtension([diffExtension, readonlyCompartment.of([])]);
 
     this.registerEvent(
-      this.app.vault.on('modify', f => this.diffMode.handleVaultModify(f as TFile))
+      this.app.vault.on('modify', f => {
+        if (f instanceof TFile) this.diffMode.handleVaultModify(f);
+      })
     );
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => this.diffMode.handleLeafChange())
@@ -53,8 +54,7 @@ export default class ReviewEditPlugin extends Plugin {
       if (!(view instanceof MarkdownView)) return;
       const actions = view.containerEl.querySelector('.view-actions');
       if (!actions || actions.querySelector('.review-edit-header-btn')) return;
-      const btn = document.createElement('div');
-      btn.className = 'clickable-icon review-edit-header-btn';
+      const btn = createDiv({ cls: 'clickable-icon review-edit-header-btn' });
       btn.setAttribute('aria-label', '与历史版本对比');
       btn.setAttribute('aria-label-position', 'left');
       setIcon(btn, 'history');
@@ -94,12 +94,14 @@ export default class ReviewEditPlugin extends Plugin {
       if (!(await this.diffMode.enter(view, entries[0]))) new Notice('没有发现差异');
     } else {
       // onChoose 是裸调用，未捕获的 rejection 会逃逸成 unhandled rejection
-      new SnapshotPickerModal(this.app, view.file, entries, async e => {
-        try {
-          if (!(await this.diffMode.enter(view, e))) new Notice('没有发现差异');
-        } catch {
-          new Notice('进入 diff 模式失败');
-        }
+      new SnapshotPickerModal(this.app, view.file, entries, e => {
+        void (async () => {
+          try {
+            if (!(await this.diffMode.enter(view, e))) new Notice('没有发现差异');
+          } catch {
+            new Notice('进入 diff 模式失败');
+          }
+        })();
       }).open();
     }
   }

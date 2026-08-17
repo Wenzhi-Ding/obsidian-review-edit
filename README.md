@@ -38,6 +38,7 @@ Manual install into a vault: copy `main.js`, `styles.css`, and `manifest.json` i
 
 1. Run `npm version patch` (or `minor`/`major`) — this bumps `package.json` and, via `version-bump.mjs`, syncs `manifest.json` and `versions.json`.
 2. Push the commit and the tag. The tag must be the exact version number **without** a `v` prefix (e.g. `1.0.1`). The `.github/workflows/release.yml` workflow builds the plugin and creates a draft GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. Publish the draft.
+3. Community-directory publishing goes through the developer dashboard at [community.obsidian.md](https://community.obsidian.md) (sign in with an Obsidian account, link GitHub, add the repo — no PR to `obsidian-releases`). The automated review scans each release and cannot see **draft** releases, so publish the draft first. After the initial acceptance, updates are automatic: users get new releases straight from GitHub, and every new release is re-reviewed.
 
 ---
 

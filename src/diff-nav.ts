@@ -2,6 +2,7 @@
  * diff 模式的差异导航条：右上/右下两处「上一处 | 差异 i/n | 下一处」。
  * 索引只针对待处理（pending）的差异块。
  */
+import { uiStrings } from './strings';
 
 /**
  * 一个待处理块被保留或撤销后，修正导航索引。
@@ -32,20 +33,21 @@ export class DiffNav {
   mount(container: HTMLElement): void {
     if (this.bars.length > 0) return;
     for (const pos of ['top', 'bottom'] as const) {
+      const t = uiStrings();
       const root = createDiv({ cls: `review-edit-nav review-edit-nav-${pos}` });
-      const prev = createEl('button', { cls: 'review-edit-nav-btn', text: '‹ 上一处' });
+      const prev = createEl('button', { cls: 'review-edit-nav-btn', text: t.navPrev });
       prev.onclick = (e) => {
         e.preventDefault();
         this.onPrev();
       };
       const count = createSpan({ cls: 'review-edit-nav-count' });
-      const next = createEl('button', { cls: 'review-edit-nav-btn', text: '下一处 ›' });
+      const next = createEl('button', { cls: 'review-edit-nav-btn', text: t.navNext });
       next.onclick = (e) => {
         e.preventDefault();
         this.onNext();
       };
-      const exit = createEl('button', { cls: 'review-edit-nav-btn review-edit-nav-exit', text: '退出' });
-      exit.setAttribute('aria-label', '退出 diff 模式（未处理的改动全部保留）');
+      const exit = createEl('button', { cls: 'review-edit-nav-btn review-edit-nav-exit', text: t.navExit });
+      exit.setAttribute('aria-label', t.navExitAria);
       exit.onclick = (e) => {
         e.preventDefault();
         this.onExit();
@@ -63,7 +65,7 @@ export class DiffNav {
   update(pendingCount: number, current: number): void {
     const n = Math.max(pendingCount, 1);
     const shown = Math.min(current + 1, n);
-    const label = `差异 ${shown}/${n}`;
+    const label = uiStrings().navCount(shown, n);
     for (const b of this.bars) {
       b.count.textContent = label;
       // 只剩一处时不置灰：点击任一按钮即重新定位到它（滚动可能已离开）

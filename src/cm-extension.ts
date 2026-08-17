@@ -1,6 +1,7 @@
 import { Compartment, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, keymap, WidgetType, type DecorationSet } from '@codemirror/view';
 import type { DiffHunk } from './diff-engine';
+import { uiStrings } from './strings';
 
 export const setHunksEffect = StateEffect.define<DiffHunk[] | null>();
 
@@ -49,13 +50,14 @@ class ToolbarWidget extends WidgetType {
     return other.hunkId === this.hunkId;
   }
   toDOM() {
+    const t = uiStrings();
     const wrap = createDiv({ cls: 'review-edit-toolbar' });
-    const keep = createEl('button', { cls: 'review-edit-btn keep', text: '保留 ✓' });
+    const keep = createEl('button', { cls: 'review-edit-btn keep', text: t.keepButton });
     keep.onclick = (e) => {
       e.preventDefault();
       handlers?.onHunkAction(this.hunkId, 'keep');
     };
-    const reject = createEl('button', { cls: 'review-edit-btn reject', text: '撤销 ✕' });
+    const reject = createEl('button', { cls: 'review-edit-btn reject', text: t.revertButton });
     reject.onclick = (e) => {
       e.preventDefault();
       handlers?.onHunkAction(this.hunkId, 'reject');

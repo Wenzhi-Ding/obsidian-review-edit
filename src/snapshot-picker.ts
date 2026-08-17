@@ -1,6 +1,7 @@
 import type { App, TFile } from 'obsidian';
 import { Modal } from 'obsidian';
 import type { SnapshotEntry } from './snapshot-source';
+import { uiStrings } from './strings';
 
 export class SnapshotPickerModal extends Modal {
   constructor(
@@ -13,14 +14,15 @@ export class SnapshotPickerModal extends Modal {
   }
 
   onOpen() {
+    const t = uiStrings();
     this.contentEl.empty();
-    this.contentEl.createEl('h3', { text: `选择 ${this.file.basename} 的对比基准` });
+    this.contentEl.createEl('h3', { text: t.pickerTitle(this.file.basename) });
     const list = this.contentEl.createDiv({ cls: 'review-edit-snapshot-list' });
     for (const e of this.entries) {
       const item = list.createDiv({ cls: 'review-edit-snapshot-item' });
       const time = window.moment(e.ts);
       item.createDiv({ text: time.format('YYYY-MM-DD HH:mm:ss') });
-      item.createDiv({ text: `${time.fromNow()} · ${e.data.length} 字符`, cls: 'review-edit-snapshot-meta' });
+      item.createDiv({ text: `${time.fromNow()} · ${t.pickerCharCount(e.data.length)}`, cls: 'review-edit-snapshot-meta' });
       item.onclick = () => {
         this.close();
         this.onChoose(e);

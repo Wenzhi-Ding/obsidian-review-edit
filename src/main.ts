@@ -3,6 +3,7 @@ import { diffExtension, readonlyCompartment } from './cm-extension';
 import { DiffModeController } from './diff-mode';
 import { getSnapshots, filterDiffering, SnapshotSourceUnavailableError } from './snapshot-source';
 import { SnapshotPickerModal } from './snapshot-picker';
+import { uiStrings } from './strings';
 
 export default class ReviewEditPlugin extends Plugin {
   diffMode!: DiffModeController;
@@ -25,22 +26,23 @@ export default class ReviewEditPlugin extends Plugin {
     );
     this.app.workspace.onLayoutReady(() => this.ensureHeaderButtons());
 
+    const t = uiStrings();
     this.addCommand({
       id: 'compare-snapshot',
-      name: '与历史版本对比',
+      name: t.commandCompareHistory,
       callback: () => void this.startReview(false),
     });
     this.addCommand({
       id: 'compare-latest-snapshot',
-      name: '与上一个快照对比',
+      name: t.commandComparePrevious,
       callback: () => void this.startReview(true),
     });
     this.addCommand({
       id: 'exit-diff-mode',
-      name: '退出 diff 模式',
+      name: t.commandExitDiffMode,
       callback: () => this.diffMode.exit(),
     });
-    this.addRibbonIcon('git-compare', '与历史版本对比', () => void this.startReview(false));
+    this.addRibbonIcon('git-compare', t.commandCompareHistory, () => void this.startReview(false));
   }
 
   onunload() {
@@ -55,7 +57,7 @@ export default class ReviewEditPlugin extends Plugin {
       const actions = view.containerEl.querySelector('.view-actions');
       if (!actions || actions.querySelector('.review-edit-header-btn')) return;
       const btn = createDiv({ cls: 'clickable-icon review-edit-header-btn' });
-      btn.setAttribute('aria-label', '与历史版本对比');
+      btn.setAttribute('aria-label', uiStrings().commandCompareHistory);
       btn.setAttribute('aria-label-position', 'left');
       setIcon(btn, 'history');
       btn.onclick = () => void this.startReview(false);
@@ -64,42 +66,43 @@ export default class ReviewEditPlugin extends Plugin {
   }
 
   private async startReview(useLatest: boolean) {
+    const t = uiStrings();
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (!view || !view.file) {
-      new Notice('请在笔记编辑器中使用');
+      new Notice(t.noticeNeedEditor);
       return;
     }
     if ((view.getState() as { mode?: string }).mode === 'preview') {
-      new Notice('请在编辑模式（而非阅读模式）下使用');
+      new Notice(t.noticeNeedSourceMode);
       return;
     }
     let rawEntries;
     try {
       rawEntries = await getSnapshots(this.app, view.file.path);
     } catch (e) {
-      new Notice(e instanceof SnapshotSourceUnavailableError ? '文件恢复插件未启用或快照数据库不可读' : '读取快照失败');
+      new Notice(e instanceof SnapshotSourceUnavailableError ? t.noticeSnapshotSourceUnavailable : t.noticeReadSnapshotsFailed);
       return;
     }
     if (rawEntries.length === 0) {
-      new Notice('该文件没有可用的历史快照');
+      new Notice(t.noticeNoSnapshots);
       return;
     }
     // 候选列表只留与当前内容不同的快照（Obsidian 落快照不一定伴随内容变化）
     const entries = filterDiffering(rawEntries, view.editor.getValue());
     if (entries.length === 0) {
-      new Notice('没有发现差异');
+      new Notice(t.noticeNoDifferences);
       return;
     }
     if (useLatest) {
-      if (!(await this.diffMode.enter(view, entries[0]))) new Notice('没有发现差异');
+      if (!(await this.diffMode.enter(view, entries[0]))) new Notice(t.noticeNoDifferences);
     } else {
       // onChoose 是裸调用，未捕获的 rejection 会逃逸成 unhandled rejection
       new SnapshotPickerModal(this.app, view.file, entries, e => {
         void (async () => {
           try {
-            if (!(await this.diffMode.enter(view, e))) new Notice('没有发现差异');
+            if (!(await this.diffMode.enter(view, e))) new Notice(t.noticeNoDifferences);
           } catch {
-            new Notice('进入 diff 模式失败');
+            new Notice(t.noticeEnterDiffFailed);
           }
         })();
       }).open();

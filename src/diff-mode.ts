@@ -3,6 +3,7 @@ import { Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { computeHunks, revertEditSpec, sameContent, shiftAfterReject, type DiffHunk } from './diff-engine';
 import { DiffNav, adjustNavIndex } from './diff-nav';
+import { uiStrings } from './strings';
 import type { SnapshotEntry } from './snapshot-source';
 import {
   READONLY_OFF,
@@ -183,7 +184,7 @@ export class DiffModeController {
     const s = this.session;
     if (!s || s.hunks.some(h => h.status === 'pending')) return;
     this.exit();
-    new Notice('没有更多差异，已退出 diff 模式');
+    new Notice(uiStrings().noticeNoMoreDifferences);
   }
 
   exit(): void {
@@ -222,7 +223,7 @@ export class DiffModeController {
     try {
       const disk = await this.app.vault.cachedRead(s.file);
       if (!sameContent(disk, s.view.editor.getValue())) {
-        new Notice('文件被外部修改，已退出 diff 模式');
+        new Notice(uiStrings().noticeFileChangedExternally);
         this.exit();
       }
     } catch {

@@ -54,14 +54,14 @@ describe('DiffNav', () => {
     expect(onExit).toHaveBeenCalledTimes(2);
   });
 
-  it('update 显示「差异 i/n」并在两端禁用对应按钮', () => {
+  it('update 显示「Diff i/n」并在两端禁用对应按钮', () => {
     const { nav, container } = mounted();
     nav.update(5, 0);
     const top = container.querySelector('.review-edit-nav-top')!;
-    expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 1/5');
+    expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('Diff 1/5');
     expect((top.querySelector('.review-edit-nav-btn') as HTMLButtonElement).disabled).toBe(true);
     nav.update(5, 2);
-    expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 3/5');
+    expect(top.querySelector('.review-edit-nav-count')!.textContent).toBe('Diff 3/5');
     const [prev, next] = Array.from(top.querySelectorAll<HTMLButtonElement>('.review-edit-nav-btn'));
     expect(prev.disabled).toBe(false);
     expect(next.disabled).toBe(false);
@@ -75,14 +75,14 @@ describe('DiffNav', () => {
     const [prev, next] = Array.from(container.querySelectorAll<HTMLButtonElement>('.review-edit-nav-bottom .review-edit-nav-btn'));
     expect(prev.disabled).toBe(false);
     expect(next.disabled).toBe(false);
-    expect(container.querySelector('.review-edit-nav-count')!.textContent).toBe('差异 1/1');
+    expect(container.querySelector('.review-edit-nav-count')!.textContent).toBe('Diff 1/1');
   });
 
   it('上下两个导航条内容一致', () => {
     const { nav, container } = mounted();
     nav.update(3, 1);
     const labels = Array.from(container.querySelectorAll('.review-edit-nav-count')).map(e => e.textContent);
-    expect(labels).toEqual(['差异 2/3', '差异 2/3']);
+    expect(labels).toEqual(['Diff 2/3', 'Diff 2/3']);
   });
 
   it('点击按钮触发回调', () => {

@@ -1,14 +1,14 @@
 # Review Edit
 
-Review the changes in a note against a historical snapshot, rendered as a git-style inline diff inside the Obsidian editor. Keep (✓) or revert (✕) each diff hunk individually. Snapshots come from the core **File Recovery** plugin — no git required.
+Review the changes in a note against a historical snapshot, rendered as a git-style inline diff inside the Obsidian editor. Keep (✓) or revert (✕) each diff hunk individually. Snapshots come from the core **File Recovery** plugin — no git required. The interface language follows Obsidian's display language (English and Chinese are built in).
 
 ## Usage
 
 1. Make sure the core plugin **File Recovery** is enabled (Settings → Core plugins → File recovery; it is on by default).
 2. Edit a note. Snapshots are taken automatically every snapshot interval (5 minutes by default).
-3. Start a review from any of the three entry points: the history button (clock icon) at the top right of the editor, the ribbon icon on the left sidebar, or the command **“与历史版本对比” (Compare with history version)** to pick a baseline snapshot. The command **“与上一个快照对比” (Compare with previous snapshot)** skips the picker and diffs against the most recent differing snapshot.
+3. Start a review from any of the three entry points: the history button (clock icon) at the top right of the editor, the ribbon icon on the left sidebar, or the command **Compare with an earlier snapshot** to pick a baseline snapshot. The command **Compare with the previous snapshot** skips the picker and diffs against the most recent differing snapshot.
 4. Green lines were added since the baseline; red blocks are old content that was removed.
-5. A navigation bar **“‹ 上一处 | 差异 i/n | 下一处 ›”** appears at the top right and bottom right of the editor. *n* is the number of pending hunks; the buttons jump between hunks, and entering review mode scrolls to the first hunk.
+5. A navigation bar **"‹ Prev | Diff i/n | Next ›"** appears at the top right and bottom right of the editor. *n* is the number of pending hunks; the buttons jump between hunks, and entering review mode scrolls to the first hunk.
 6. **Keep ✓** keeps the current text. **Revert ✕** restores the old text for that hunk, and the counter decreases. When every hunk is handled, review mode exits automatically. The navigation bar also has an exit button (or press `Esc`) — unhandled changes are all kept.
 
 ## Known limitations
@@ -43,7 +43,7 @@ Manual install into a vault: copy `main.js`, `styles.css`, and `manifest.json` i
 
 # 中文说明
 
-在 Obsidian 编辑器内以 git diff 风格审查一篇笔记相对历史快照的改动，逐块「保留 ✓」或「撤销 ✕」。基于核心插件「文件恢复」的快照，不依赖 git。
+在 Obsidian 编辑器内以 git diff 风格审查一篇笔记相对历史快照的改动，逐块「保留 ✓」或「撤销 ✕」。基于核心插件「文件恢复」的快照，不依赖 git。界面语言跟随 Obsidian 显示语言（内置中英文）。
 
 ## 使用
 

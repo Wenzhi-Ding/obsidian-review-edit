@@ -3,8 +3,8 @@
   "name": "Review Edit",
   "version": "1.0.0",
   "minAppVersion": "1.5.0",
-  "description": "Review note changes against File Recovery snapshots as an inline diff, then keep or revert each hunk.（基于文件恢复快照的 diff 式改动审查，逐块保留或撤销）",
+  "description": "Review note edits as a Git-style diff, then keep or revert each hunk. Ideal for reviewing AI edits.",
   "author": "Wenzhi Ding",
-  "authorUrl": "https://github.com/REPLACE-WITH-YOUR-GITHUB-USERNAME",
+  "authorUrl": "https://github.com/Wenzhi-Ding/obsidian-review-edit",
   "isDesktopOnly": false
 }

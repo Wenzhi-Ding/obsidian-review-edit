@@ -5,24 +5,27 @@
 import { uiStrings } from './strings';
 
 /**
- * 一个待处理块被保留或撤销后，修正导航索引。
- * @param pendingIdsBefore 变更前的待处理块 id 列表（按文档位置排序）
- * @param removedId 刚被处理掉的块 id
- * @param current 变更前的当前索引（0-based，指向 pendingIdsBefore）
- * @returns 新索引，已夹取到新列表范围内
+ * 以视口中心为基准，在待处理块中找导航目标。
+ * 中心落在某块范围内时该块算「当前块」，两个方向都跳过它。
+ * @param pending 待处理块（按文档位置排序；currentTo 为不含的结束行）
+ * @param centerLine 视口中心所在的 0-based 行号
+ * @param dir 导航方向：1 为下一处，-1 为上一处
+ * @returns 目标块在 pending 中的索引；该方向没有差异时返回 -1
  */
-export function adjustNavIndex(
-  pendingIdsBefore: readonly number[],
-  removedId: number,
-  current: number
+export function findNavTarget(
+  pending: readonly { currentFrom: number; currentTo: number }[],
+  centerLine: number,
+  dir: -1 | 1
 ): number {
-  const pos = pendingIdsBefore.indexOf(removedId);
-  if (pos === -1) {
-    return Math.max(0, Math.min(current, pendingIdsBefore.length - 1));
+  if (dir === 1) {
+    return pending.findIndex(h => h.currentFrom > centerLine);
   }
-  let next = current;
-  if (pos < current) next -= 1;
-  return Math.max(0, Math.min(next, pendingIdsBefore.length - 2));
+  for (let i = pending.length - 1; i >= 0; i--) {
+    // 纯删除块（from === to）不占行，按所在行参与比较
+    const lastLine = Math.max(pending[i].currentFrom, pending[i].currentTo - 1);
+    if (lastLine < centerLine) return i;
+  }
+  return -1;
 }
 
 export class DiffNav {
@@ -61,16 +64,14 @@ export class DiffNav {
     }
   }
 
-  /** @param pendingCount 待处理块总数；@param current 当前索引（0-based） */
+  /** @param pendingCount 待处理块总数；@param current 计数显示用的当前索引（0-based） */
   update(pendingCount: number, current: number): void {
     const n = Math.max(pendingCount, 1);
     const shown = Math.min(current + 1, n);
     const label = uiStrings().navCount(shown, n);
+    // 按钮永不置灰：目标以视口位置为准，任何位置点击都可能重新定位
     for (const b of this.bars) {
       b.count.textContent = label;
-      // 只剩一处时不置灰：点击任一按钮即重新定位到它（滚动可能已离开）
-      b.prev.disabled = pendingCount > 1 && current <= 0;
-      b.next.disabled = pendingCount > 1 && current >= pendingCount - 1;
     }
   }
 

@@ -2,7 +2,7 @@ import type { App, Editor, MarkdownView, Plugin, TFile } from 'obsidian';
 import { Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { computeHunks, revertEditSpec, sameContent, shiftAfterReject, type DiffHunk } from './diff-engine';
-import { DiffNav, adjustNavIndex } from './diff-nav';
+import { DiffNav, findNavTarget } from './diff-nav';
 import { uiStrings } from './strings';
 import type { SnapshotEntry } from './snapshot-source';
 import {
@@ -22,14 +22,22 @@ interface Session {
   savedViewState: Record<string, unknown> | null;
   /** enter 时的 CM 实例；与当前不一致则会话已失效 */
   cm: EditorView;
-  /** 差异导航条；索引只针对待处理块 */
+  /** 差异导航条 */
   nav: DiffNav;
+  /** 计数显示用的索引（最近跳转到的待处理块）；导航目标以视口位置为准，不依赖它 */
   navIndex: number;
 }
 
 /** editor.cm 是公开的运行时属性但类型包未声明，这里集中做一次非 any 的取值 */
 function cmOf(view: MarkdownView): EditorView | undefined {
   return (view.editor as Editor & { cm?: EditorView }).cm;
+}
+
+/** 视口中心所在的 0-based 行号 */
+function viewportCenterLine(cm: EditorView): number {
+  const y = cm.scrollDOM.scrollTop + cm.scrollDOM.clientHeight / 2;
+  const pos = cm.lineBlockAtHeight(y).from;
+  return cm.state.doc.lineAt(pos).number - 1;
 }
 
 export class DiffModeController {
@@ -102,7 +110,6 @@ export class DiffModeController {
       return;
     }
     const s = this.session;
-    const pendingIdsBefore = s.hunks.filter(h => h.status === 'pending').map(h => h.id);
     this.session.hunks = s.hunks.map(h =>
       h.id === id ? { ...h, status: 'kept' as const } : h
     );
@@ -112,7 +119,7 @@ export class DiffModeController {
       this.exit();
       return;
     }
-    this.afterHunkResolved(pendingIdsBefore, id);
+    this.afterHunkResolved();
     this.exitIfAllResolved();
   }
 
@@ -125,7 +132,6 @@ export class DiffModeController {
     }
     const hunk = this.session.hunks.find(h => h.id === id);
     if (!hunk || hunk.status !== 'pending') return;
-    const pendingIdsBefore = this.session.hunks.filter(h => h.status === 'pending').map(h => h.id);
     const spec = revertEditSpec(cm.state.doc, hunk);
     this.session.hunks = shiftAfterReject(this.session.hunks, id);
     try {
@@ -137,36 +143,36 @@ export class DiffModeController {
       this.exit();
       return;
     }
-    this.afterHunkResolved(pendingIdsBefore, id);
+    this.afterHunkResolved();
     this.exitIfAllResolved();
   }
 
-  /** 一个块处理完后：修正导航索引并刷新导航条计数 */
-  private afterHunkResolved(pendingIdsBefore: number[], resolvedId: number): void {
+  /** 一个块处理完后：计数显示夹到新范围内并刷新导航条 */
+  private afterHunkResolved(): void {
     const s = this.session;
     if (!s) return;
-    s.navIndex = adjustNavIndex(pendingIdsBefore, resolvedId, s.navIndex);
-    s.nav.update(this.pendingCount(), s.navIndex);
+    const count = this.pendingCount();
+    s.navIndex = Math.max(0, Math.min(s.navIndex, count - 1));
+    s.nav.update(count, s.navIndex);
   }
 
   private pendingCount(): number {
     return this.session?.hunks.filter(h => h.status === 'pending').length ?? 0;
   }
 
-  /** 导航条按钮：移动当前差异块并滚动定位；只剩一处或已在边界时仍重新滚动到当前块 */
+  /** 导航条按钮：以视口中心为基准去该方向最近的待处理块；该方向没有差异时视图不动 */
   private stepNav(dir: -1 | 1): void {
     const s = this.session;
     if (!s) return;
     const pending = s.hunks.filter(h => h.status === 'pending');
     if (pending.length === 0) return;
-    const next = Math.max(0, Math.min(s.navIndex + dir, pending.length - 1));
-    if (next !== s.navIndex) {
-      s.navIndex = next;
-      s.nav.update(pending.length, next);
-    }
     const cm = this.liveCm();
-    const target = pending[Math.min(s.navIndex, pending.length - 1)];
-    if (cm && target) this.scrollToHunk(cm, target);
+    if (!cm) return;
+    const index = findNavTarget(pending, viewportCenterLine(cm), dir);
+    if (index < 0) return;
+    s.navIndex = index;
+    s.nav.update(pending.length, index);
+    this.scrollToHunk(cm, pending[index]);
   }
 
   /** 滚动让差异块出现在编辑器垂直居中位置 */

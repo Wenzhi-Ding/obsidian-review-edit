@@ -1,7 +1,7 @@
 {
   "id": "review-edit",
   "name": "Review Edit",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.5.0",
   "description": "Review note edits as a Git-style diff, then keep or revert each hunk. Ideal for reviewing AI edits.",
   "author": "Wenzhi Ding",

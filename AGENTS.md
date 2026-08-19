@@ -13,3 +13,10 @@ Session evidence: 2026-08-17 filterDiffering 首版裸比较与引擎归一化�
 - README 英文部分不混中文；中文内容集中在文末「中文说明」章节。
 - 用户可见的界面文字一律放 `src/strings.ts`，新增条目同时补 zh/en 两套，不在组件里硬编码单一语言。
 - `manifest.json` 任何字段改动推送到 main 后，必须 bump 版本并发新 release（`npm version patch` → 推 tag → 发布 Actions 建的 draft）——社区审核扫描的是 release 资产里的 manifest.json，不是仓库文件；只改仓库不重发，旧资产会继续被打回。
+
+## 发版与本地验证
+
+- 发版：`npm version patch`（version-bump.mjs 自动同步 `manifest.json`、`versions.json`）→ 推 main 和 tag（tag 名即版本号，无 `v` 前缀）→ Actions 构建 draft（资产 `main.js`/`manifest.json`/`styles.css`，含 artifact attestation）。
+- 发布 draft 时必须填 release notes（面向用户的变更 + compare 链接）：Actions 建的 draft 没有 body，`gh release edit <tag> --draft=false` 要带 `--notes`；空描述会被审核提示。发布后下载资产核对 manifest 版本号——审核扫的是 release 资产，不是仓库文件。
+- 社区市场经 developer dashboard（community.obsidian.md）提交仓库；初审通过后用户自动获得新 release，每个新 release 会被自动复审。
+- 让用户验证前，先把构建产物复制进 vault（Git Bash）：`cp manifest.json main.js styles.css "/c/Users/wenzh/Documents/MyLibrary/.obsidian/plugins/review-edit/"`——Obsidian 加载的是 vault 里的文件，仓库里的构建产物用户看不到。

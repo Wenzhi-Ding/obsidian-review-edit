@@ -46,6 +46,8 @@ describe('自动快照设置文案', () => {
     'settingThresholdDesc',
     'settingRetentionName',
     'settingRetentionDesc',
+    'settingThresholdInvalid',
+    'settingRetentionInvalid',
     'settingBaselineName',
     'settingBaselineDesc',
     'settingPurgeName',

@@ -38,6 +38,9 @@ export interface UiStrings {
   settingThresholdDesc: string;
   settingRetentionName: string;
   settingRetentionDesc: string;
+  /** 声明式设置 number 控件的行内校验错误（1.13+） */
+  settingThresholdInvalid: string;
+  settingRetentionInvalid: string;
   settingBaselineName: string;
   settingBaselineDesc: string;
   settingPurgeName: string;
@@ -84,6 +87,8 @@ const zh: UiStrings = {
   settingThresholdDesc: '两次编辑的间隔超过该时长视为新的编辑会话，会话开始前的内容会被自动快照。范围 1–60。',
   settingRetentionName: '快照保留天数',
   settingRetentionDesc: '更早的自动快照会被自动清理。范围 1–365。',
+  settingThresholdInvalid: '请输入 1–60 之间的整数。',
+  settingRetentionInvalid: '请输入 1–365 之间的整数。',
   settingBaselineName: '重建快照',
   settingBaselineDesc: '为所有笔记写入当前内容的快照（内容未变化的自动跳过）。',
   settingPurgeName: '清除全部自动快照',
@@ -132,6 +137,8 @@ const en: UiStrings = {
     'A gap longer than this between edits starts a new session; the pre-session content is snapshotted. Range 1–60.',
   settingRetentionName: 'Snapshot retention (days)',
   settingRetentionDesc: 'Older automatic snapshots are pruned automatically. Range 1–365.',
+  settingThresholdInvalid: 'Enter a whole number between 1 and 60.',
+  settingRetentionInvalid: 'Enter a whole number between 1 and 365.',
   settingBaselineName: 'Rebuild snapshots',
   settingBaselineDesc: 'Snapshot the current content of all notes (unchanged notes are skipped).',
   settingPurgeName: 'Purge all automatic snapshots',

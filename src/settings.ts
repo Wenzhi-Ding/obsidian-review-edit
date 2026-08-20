@@ -1,4 +1,4 @@
-import type { App, Plugin } from 'obsidian';
+import type { App, ButtonComponent, Plugin, SettingDefinitionItem } from 'obsidian';
 import { Modal, PluginSettingTab, Setting } from 'obsidian';
 
 import { uiStrings } from './strings';
@@ -58,6 +58,94 @@ export class ReviewEditSettingTab extends PluginSettingTab {
     super(app, plugin as unknown as Plugin);
   }
 
+  /**
+   * 1.13+ 声明式设置：返回非空数组后 Obsidian 用它渲染设置页并索引进设置搜索，
+   * display() 只作为 1.13 之前的回退路径（minAppVersion 1.5）。两条路径的
+   * 结构须保持一致：控件项改这里，按钮项改 wireBaselineButton/PurgeConfirmModal。
+   */
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const t = uiStrings();
+    // 与 display() 的 'settings-display' 对应：声明式渲染下框架每次渲染都调用本方法
+    if (__DIAG__) this.plugin.diagLog('settings-definitions');
+    return [
+      {
+        type: 'group',
+        heading: t.settingsOwnSnapshotsSection,
+        items: [
+          {
+            name: t.settingOwnSnapshotsName,
+            desc: t.settingOwnSnapshotsDesc,
+            control: {
+              type: 'toggle',
+              key: 'ownSnapshotsEnabled',
+              defaultValue: DEFAULT_SETTINGS.ownSnapshotsEnabled,
+            },
+          },
+          {
+            name: t.settingThresholdName,
+            desc: t.settingThresholdDesc,
+            control: {
+              type: 'number',
+              key: 'burstThresholdMinutes',
+              defaultValue: DEFAULT_SETTINGS.burstThresholdMinutes,
+              min: 1,
+              max: 60,
+              step: 1,
+              validate: v => (Number.isInteger(v) && v >= 1 && v <= 60 ? undefined : t.settingThresholdInvalid),
+            },
+          },
+          {
+            name: t.settingRetentionName,
+            desc: t.settingRetentionDesc,
+            control: {
+              type: 'number',
+              key: 'retentionDays',
+              defaultValue: DEFAULT_SETTINGS.retentionDays,
+              min: 1,
+              max: 365,
+              step: 1,
+              validate: v => (Number.isInteger(v) && v >= 1 && v <= 365 ? undefined : t.settingRetentionInvalid),
+            },
+          },
+          {
+            name: t.settingBaselineName,
+            desc: t.settingBaselineDesc,
+            // 重建期间要禁用按钮并把进度文案实时写在按钮上，须持有 ButtonComponent，走命令式 render
+            render: setting => {
+              setting.addButton(b => this.wireBaselineButton(b));
+              return () => {
+                this.plugin.onBaselineProgressUI = null;
+              };
+            },
+          },
+          {
+            name: t.settingPurgeName,
+            desc: t.settingPurgeDesc,
+            action: () => {
+              new PurgeConfirmModal(this.app, this.plugin).open();
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  /** 声明式控件取值：宿主是 SettingsHost 接口，显式覆写而非依赖基类对 plugin.settings 的默认读取 */
+  getControlValue(key: string): unknown {
+    return (this.plugin.settings as unknown as Record<string, unknown>)[key];
+  }
+
+  /** 声明式控件写值：持久化后分发 ownSnapshotsEnabled 的启停副作用（等价于 display() 路径的 onChange） */
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+    await this.plugin.saveSettings();
+    if (key === 'ownSnapshotsEnabled') {
+      if (value) await this.plugin.enableOwnSnapshots();
+      else this.plugin.disableOwnSnapshots();
+    }
+  }
+
+  /** <1.13 的回退渲染；1.13+ 框架改用 getSettingDefinitions，本方法不再被调用 */
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
@@ -123,22 +211,7 @@ export class ReviewEditSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName(t.settingBaselineName)
       .setDesc(t.settingBaselineDesc)
-      .addButton(b => {
-        b.setButtonText(t.settingBaselineName).onClick(() => {
-          if (__DIAG__) this.plugin.diagLog('settings-button-clicked');
-          b.setDisabled(true);
-          void this.plugin.rebuildBaseline().finally(() => {
-            b.setDisabled(false);
-            if (__DIAG__) this.plugin.diagLog('button-reenabled');
-          });
-        });
-        // 诊断锚点：不依赖文本匹配即可从 DOM 定位本按钮（eval 复现/截图标注用）
-        if (__DIAG__) b.buttonEl.addClass('review-edit-rebuild-btn');
-        // 进度直接显示在按钮上，不弹常驻通知（悬浮通知在主窗口的行为是冻死嫌疑对象）
-        this.plugin.onBaselineProgressUI = text => {
-          b.setButtonText(text ?? t.settingBaselineName);
-        };
-      })
+      .addButton(b => this.wireBaselineButton(b))
 
     new Setting(containerEl)
       .setName(t.settingPurgeName)
@@ -146,5 +219,24 @@ export class ReviewEditSettingTab extends PluginSettingTab {
       .addButton(b =>
         b.setButtonText(t.settingPurgeName).onClick(() => new PurgeConfirmModal(this.app, this.plugin).open())
       );
+  }
+
+  /** 重建按钮的命令式逻辑：display() 回退路径与 getSettingDefinitions 的 render 定义共用 */
+  private wireBaselineButton(b: ButtonComponent): void {
+    const t = uiStrings();
+    b.setButtonText(t.settingBaselineName).onClick(() => {
+      if (__DIAG__) this.plugin.diagLog('settings-button-clicked');
+      b.setDisabled(true);
+      void this.plugin.rebuildBaseline().finally(() => {
+        b.setDisabled(false);
+        if (__DIAG__) this.plugin.diagLog('button-reenabled');
+      });
+    });
+    // 诊断锚点：不依赖文本匹配即可从 DOM 定位本按钮（eval 复现/截图标注用）
+    if (__DIAG__) b.buttonEl.addClass('review-edit-rebuild-btn');
+    // 进度直接显示在按钮上，不弹常驻通知（悬浮通知在主窗口的行为是冻死嫌疑对象）
+    this.plugin.onBaselineProgressUI = text => {
+      b.setButtonText(text ?? t.settingBaselineName);
+    };
   }
 }

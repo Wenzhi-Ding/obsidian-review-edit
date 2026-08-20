@@ -56,7 +56,6 @@ export class ReviewEditSettingTab extends PluginSettingTab {
   }
 
   display(): void {
-    const t = uiStrings();
     const { containerEl } = this;
     containerEl.empty();
     // 若设置页被反复重渲染，rebuild.log 会堆满本行——直接暴露渲染风暴
@@ -117,7 +116,7 @@ export class ReviewEditSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName(t.settingBaselineName)
       .setDesc(t.settingBaselineDesc)
-      .addButton(b =>
+      .addButton(b => {
         b.setButtonText(t.settingBaselineName).onClick(() => {
           this.plugin.diagLog('settings-button-clicked');
           b.setDisabled(true);
@@ -125,8 +124,10 @@ export class ReviewEditSettingTab extends PluginSettingTab {
             b.setDisabled(false);
             this.plugin.diagLog('button-reenabled');
           });
-        })
-      );
+        });
+        // 诊断锚点：不依赖文本匹配即可从 DOM 定位本按钮（eval 复现/截图标注用）
+        b.buttonEl.addClass('review-edit-rebuild-btn');
+      })
 
     new Setting(containerEl)
       .setName(t.settingPurgeName)

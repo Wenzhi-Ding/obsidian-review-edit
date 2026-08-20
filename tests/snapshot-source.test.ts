@@ -35,7 +35,7 @@ describe('getSnapshots', () => {
     await expect(getSnapshots(app, 'x.md')).rejects.toBeInstanceOf(SnapshotSourceUnavailableError);
   });
 
-  it('按时间倒序返回且合并相邻相同内容', async () => {
+  it('按时间倒序返回且合并相邻相同内容，条目标记为 file-recovery 来源', async () => {
     const recs = [
       { path: 'a.md', ts: 300, data: 'v2' },
       { path: 'a.md', ts: 200, data: 'v2' },
@@ -43,13 +43,16 @@ describe('getSnapshots', () => {
       { path: 'b.md', ts: 250, data: 'z' },
     ];
     const out = await getSnapshots(mockApp(mockDb(recs)), 'a.md');
-    expect(out).toEqual([{ ts: 300, data: 'v2' }, { ts: 100, data: 'v1' }]);
+    expect(out).toEqual([
+      { ts: 300, data: 'v2', source: 'file-recovery' },
+      { ts: 100, data: 'v1', source: 'file-recovery' },
+    ]);
   });
 
   it('无 path 索引时回退到全量读取再过滤', async () => {
     const recs = [{ path: 'a.md', ts: 1, data: 'x' }];
     const out = await getSnapshots(mockApp(mockDb(recs, false)), 'a.md');
-    expect(out).toEqual([{ ts: 1, data: 'x' }]);
+    expect(out).toEqual([{ ts: 1, data: 'x', source: 'file-recovery' }]);
   });
 
   it('IndexedDB 抛错时原样向上抛出', async () => {
@@ -95,7 +98,7 @@ describe('dedupeAdjacent', () => {
 });
 
 describe('getMergedSnapshots', () => {
-  it('两源按时间倒序合并并去重相邻同内容', async () => {
+  it('两源按时间倒序合并并去重相邻同内容，条目带各自来源标记', async () => {
     const fr = mockApp(
       mockDb([
         { path: 'a.md', ts: 100, data: 'v1' },
@@ -104,9 +107,9 @@ describe('getMergedSnapshots', () => {
     );
     const own = mockStore([{ path: 'a.md', ts: 200, data: 'v2' }]);
     expect(await getMergedSnapshots(fr, 'a.md', own)).toEqual([
-      { ts: 400, data: 'v3' },
-      { ts: 200, data: 'v2' },
-      { ts: 100, data: 'v1' },
+      { ts: 400, data: 'v3', source: 'file-recovery' },
+      { ts: 200, data: 'v2', source: 'own' },
+      { ts: 100, data: 'v1', source: 'file-recovery' },
     ]);
   });
 
@@ -114,16 +117,16 @@ describe('getMergedSnapshots', () => {
     const onErr = vi.fn();
     const fr = mockApp(mockDb([{ path: 'a.md', ts: 100, data: 'v1' }]));
     expect(await getMergedSnapshots(fr, 'a.md', mockStore([], true), onErr)).toEqual([
-      { ts: 100, data: 'v1' },
+      { ts: 100, data: 'v1', source: 'file-recovery' },
     ]);
     expect(onErr).toHaveBeenCalledTimes(1);
   });
 
   it('file-recovery 不可用但自建库可用（含为空）：返回自建条目，不抛错', async () => {
     const noFr = { internalPlugins: { getEnabledPluginById: () => null } } as unknown as App;
-    expect(await getMergedSnapshots(noFr, 'a.md', mockStore([{ path: 'a.md', ts: 1, data: 'x' }]))).toEqual([
-      { ts: 1, data: 'x' },
-    ]);
+    expect(
+      await getMergedSnapshots(noFr, 'a.md', mockStore([{ path: 'a.md', ts: 1, data: 'x' }]))
+    ).toEqual([{ ts: 1, data: 'x', source: 'own' }]);
     expect(await getMergedSnapshots(noFr, 'a.md', mockStore([]))).toEqual([]);
   });
 

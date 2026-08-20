@@ -21,7 +21,14 @@ export class SnapshotPickerModal extends Modal {
     for (const e of this.entries) {
       const item = list.createDiv({ cls: 'review-edit-snapshot-item' });
       const time = window.moment(e.ts);
-      item.createDiv({ text: time.format('YYYY-MM-DD HH:mm:ss') });
+      const head = item.createDiv({ cls: 'review-edit-snapshot-head' });
+      head.createSpan({ text: time.format('YYYY-MM-DD HH:mm:ss') });
+      head.createSpan({
+        cls:
+          'review-edit-source-tag ' +
+          (e.source === 'file-recovery' ? 'review-edit-source-file-recovery' : 'review-edit-source-own'),
+        text: e.source === 'file-recovery' ? t.pickerSourceFileRecovery : t.pickerSourceOwn,
+      });
       item.createDiv({ text: `${time.fromNow()} · ${t.pickerCharCount(e.data.length)}`, cls: 'review-edit-snapshot-meta' });
       item.onclick = () => {
         this.close();

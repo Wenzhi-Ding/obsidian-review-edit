@@ -27,6 +27,9 @@ export interface UiStrings {
   revertButton: string;
   pickerTitle: (basename: string) => string;
   pickerCharCount: (chars: number) => string;
+  /** 选择器里区分快照来源的徽标 */
+  pickerSourceOwn: string;
+  pickerSourceFileRecovery: string;
   /** —— 自动快照（设置页 + 通知） —— */
   settingsOwnSnapshotsSection: string;
   settingOwnSnapshotsName: string;
@@ -72,6 +75,8 @@ const zh: UiStrings = {
   revertButton: '撤销 ✕',
   pickerTitle: basename => `选择 ${basename} 的对比基准`,
   pickerCharCount: chars => `${chars} 字符`,
+  pickerSourceOwn: '自动快照',
+  pickerSourceFileRecovery: '文件恢复',
   settingsOwnSnapshotsSection: '自动快照',
   settingOwnSnapshotsName: '启用自动快照',
   settingOwnSnapshotsDesc: '在每次编辑会话开始前自动保存笔记快照，供历史比对使用。快照只存储在本机，不上传。',
@@ -116,6 +121,8 @@ const en: UiStrings = {
   revertButton: 'Revert ✕',
   pickerTitle: basename => `Choose a baseline for ${basename}`,
   pickerCharCount: chars => `${chars} chars`,
+  pickerSourceOwn: 'Automatic',
+  pickerSourceFileRecovery: 'File Recovery',
   settingsOwnSnapshotsSection: 'Automatic snapshots',
   settingOwnSnapshotsName: 'Enable automatic snapshots',
   settingOwnSnapshotsDesc:

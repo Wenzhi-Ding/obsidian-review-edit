@@ -5,6 +5,8 @@ import type { SnapshotStoreLike } from './snapshot-store';
 export interface SnapshotEntry {
   ts: number;
   data: string;
+  /** 快照来源：合并层统一打标，选择器据此展示徽标；缺省视为自建库 */
+  source?: 'own' | 'file-recovery';
 }
 
 export class SnapshotSourceUnavailableError extends Error {
@@ -57,7 +59,7 @@ export async function getSnapshots(app: App, path: string): Promise<SnapshotEntr
   }
 
   backups.sort((a, b) => b.ts - a.ts);
-  return dedupeAdjacent(backups.map(b => ({ ts: b.ts, data: b.data })));
+  return dedupeAdjacent(backups.map(b => ({ ts: b.ts, data: b.data, source: 'file-recovery' as const })));
 }
 
 /** 相邻内容相同只保留最新一条，减少选择器噪音；「相同」按 diff 引擎口径 */
@@ -94,7 +96,7 @@ export async function getMergedSnapshots(
   let ownFailed = false;
   if (store) {
     try {
-      own = await store.getEntries(path);
+      own = (await store.getEntries(path)).map(e => ({ ...e, source: 'own' as const }));
     } catch {
       ownFailed = true;
       onOwnStoreError?.();

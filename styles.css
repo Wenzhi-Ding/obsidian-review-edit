@@ -49,6 +49,23 @@
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
 }
+.review-edit-snapshot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.review-edit-source-tag {
+  font-size: var(--font-ui-smaller);
+  padding: 1px 8px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+}
+.review-edit-source-own {
+  color: var(--text-accent);
+}
+.review-edit-source-file-recovery {
+  color: var(--text-muted);
+}
 /* review-edit：差异导航条（编辑器右上/右下） */
 .review-edit-nav {
   position: absolute;

@@ -54,6 +54,8 @@ describe('自动快照设置文案', () => {
     'confirmPurgeBody',
     'confirmPurgeConfirm',
     'confirmPurgeCancel',
+    'pickerSourceOwn',
+    'pickerSourceFileRecovery',
     'noticeStoreOpenFailed',
     'noticePurgeDone',
     'noticeOwnStoreReadFailed',

@@ -146,3 +146,40 @@ export class SnapshotRecorder {
     });
   }
 }
+
+export interface BaselineScanOptions {
+  batchSize?: number;
+  yieldControl?: () => Promise<void>;
+  shouldContinue?: () => boolean;
+  now?: () => number;
+}
+
+/**
+ * 全库基线扫描：为每个 md 文件写一条当前内容快照。
+ * 内容未变化的文件被 add 的去重闸门跳过，重跑天然增量。
+ * 分批执行、批间让出主线程，避免大 vault 卡顿。
+ */
+export async function runBaselineScan(
+  vault: Pick<Vault, 'getMarkdownFiles' | 'cachedRead'>,
+  store: SnapshotStoreLike,
+  opts: BaselineScanOptions = {}
+): Promise<number> {
+  const batchSize = opts.batchSize ?? 200;
+  const yieldControl = opts.yieldControl ?? (() => new Promise<void>(r => setTimeout(r, 0)));
+  const shouldContinue = opts.shouldContinue ?? (() => true);
+  const now = opts.now ?? Date.now;
+  const files = vault.getMarkdownFiles();
+  let written = 0;
+  for (let i = 0; i < files.length; i += batchSize) {
+    for (const f of files.slice(i, i + batchSize)) {
+      if (!shouldContinue()) return written;
+      try {
+        if (await store.add(f.path, now(), await vault.cachedRead(f))) written++;
+      } catch {
+        /* 单文件失败跳过 */
+      }
+    }
+    await yieldControl();
+  }
+  return written;
+}

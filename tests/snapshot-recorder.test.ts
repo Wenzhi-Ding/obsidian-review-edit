@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EventRef, TFile } from 'obsidian';
 import { sameContent } from '../src/diff-engine';
 import type { SnapshotStoreLike } from '../src/snapshot-store';
-import { SnapshotRecorder, type RecorderVault } from '../src/snapshot-recorder';
+import { SnapshotRecorder, runBaselineScan, type RecorderVault } from '../src/snapshot-recorder';
 
 /** 内存实现：记录 add 调用，真实执行去重闸门，可注入既有条目模拟「重启前的库」 */
 class MemoryStore implements SnapshotStoreLike {
@@ -200,5 +200,70 @@ describe('SnapshotRecorder', () => {
     await vi.advanceTimersByTimeAsync(10 * THRESHOLD); // 计时器已清，不再有会话结束写入
     expect(store.addCalls).toHaveLength(2); // 改前 v1 + dispose flush 的 v2
     expect(env.registeredRefs()).toBe(before - 3);
+  });
+});
+
+describe('runBaselineScan', () => {
+  function scanVault(files: string[]) {
+    let readCount = 0;
+    return {
+      vault: {
+        getMarkdownFiles: () => files.map(p => ({ path: p, extension: 'md' } as unknown as TFile)),
+        cachedRead: async (f: unknown) => {
+          readCount++;
+          return `content of ${(f as TFile).path}`;
+        },
+      } as unknown as Parameters<typeof runBaselineScan>[0],
+      readCount: () => readCount,
+    };
+  }
+
+  it('分批读全部文件写入快照，批间让出控制权', async () => {
+    const store = new MemoryStore();
+    const files = Array.from({ length: 205 }, (_, i) => `note${i}.md`);
+    const { vault, readCount } = scanVault(files);
+    let yields = 0;
+    const written = await runBaselineScan(vault, store, {
+      batchSize: 100,
+      yieldControl: async () => {
+        yields++;
+      },
+    });
+    expect(written).toBe(205);
+    expect(store.entries).toHaveLength(205);
+    expect(readCount()).toBe(205);
+    expect(yields).toBeGreaterThanOrEqual(2); // 205 / 100 → 至少两次批间让出
+  });
+
+  it('重跑经去重闸门自动增量：内容没变不写入', async () => {
+    const store = new MemoryStore();
+    const { vault } = scanVault(['a.md', 'b.md']);
+    expect(await runBaselineScan(vault, store)).toBe(2);
+    expect(await runBaselineScan(vault, store)).toBe(0);
+  });
+
+  it('shouldContinue 中途变 false：立即停止并返回已完成数', async () => {
+    const store = new MemoryStore();
+    const { vault } = scanVault(['a.md', 'b.md', 'c.md']);
+    let call = 0;
+    const written = await runBaselineScan(vault, store, {
+      batchSize: 1,
+      shouldContinue: () => ++call <= 2,
+    });
+    expect(written).toBe(2);
+    expect(store.entries).toHaveLength(2);
+  });
+
+  it('单文件读失败跳过，不影响其余文件', async () => {
+    const store = new MemoryStore();
+    const vault = {
+      getMarkdownFiles: () =>
+        ['ok.md', 'bad.md'].map(p => ({ path: p, extension: 'md' } as unknown as TFile)),
+      cachedRead: async (f: unknown) => {
+        if ((f as TFile).path === 'bad.md') throw new Error('boom');
+        return 'x';
+      },
+    } as unknown as Parameters<typeof runBaselineScan>[0];
+    expect(await runBaselineScan(vault, store)).toBe(1);
   });
 });

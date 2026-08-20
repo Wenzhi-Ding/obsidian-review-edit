@@ -67,7 +67,7 @@ function fakeVault(content: () => string | Promise<string>) {
       read: async () => content(),
     } as unknown as RecorderVault,
     fire: (ev: string, ...args: unknown[]) => {
-      for (const cb of handlers.get(ev) ?? []) cb(...args);
+      for (const cb of handlers.get(ev) ?? []) (cb as (...a: unknown[]) => void)(...args);
     },
     registeredRefs: () => refs.length,
   };

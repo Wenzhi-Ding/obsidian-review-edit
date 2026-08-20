@@ -62,7 +62,7 @@ export class SnapshotRecorder {
     this.refs.length = 0;
   }
 
-  private enqueue(path: string, fn: () => Promise<void>): Promise<void> {
+  private enqueue(path: string, fn: () => Promise<unknown>): Promise<void> {
     const prev = this.ops.get(path) ?? Promise.resolve();
     const next = prev.then(fn, fn).then(
       () => undefined,
@@ -132,11 +132,15 @@ export class SnapshotRecorder {
   private onRename(file: TAbstractFile, oldPath: string): void {
     const f = file as TFile;
     void this.enqueue(oldPath, () => this.store.migratePath(oldPath, f.path)).then(() => {
-      for (const m of [this.lastModifyTs, this.lastKnown]) {
-        if (m.has(oldPath)) {
-          m.set(f.path, m.get(oldPath)!);
-          m.delete(oldPath);
-        }
+      const ts = this.lastModifyTs.get(oldPath);
+      if (ts !== undefined) {
+        this.lastModifyTs.set(f.path, ts);
+        this.lastModifyTs.delete(oldPath);
+      }
+      const content = this.lastKnown.get(oldPath);
+      if (content !== undefined) {
+        this.lastKnown.set(f.path, content);
+        this.lastKnown.delete(oldPath);
       }
       const t = this.endTimers.get(oldPath);
       if (t !== undefined) {

@@ -14,6 +14,14 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
   private store: SnapshotStore | null = null;
   private recorder: SnapshotRecorder | null = null;
   private ownStoreErrorNoticed = false;
+  /** 当前常驻进度通知的持有者；重建结束/插件卸载时清理，防止残留。
+   *  用对象包装而非直接持有 Notice：闭包内赋值的属性在 finally 里不会被流分析收窄。 */
+  private progressHolder: { notice: Notice | null } | null = null;
+
+  private hideProgressNotice(): void {
+    this.progressHolder?.notice?.hide();
+    this.progressHolder = null;
+  }
   /** 重建快照的诊断日志：写插件目录下 rebuild.log，进程冻死后可从磁盘读取定位停点 */
   private rebuildLogPath(): string {
     return `${this.app.vault.configDir}/plugins/review-edit/rebuild.log`;
@@ -78,6 +86,7 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
 
   onunload() {
     this.diffMode.exit();
+    this.hideProgressNotice();
     this.disableOwnSnapshots();
     this.store?.close();
     this.store = null;
@@ -137,8 +146,11 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     if (!store || this.baselineRunning) return;
     this.baselineRunning = true;
     const t = uiStrings();
+    // 清掉上次运行可能残留的常驻进度通知（中途出错/冻死时会留在屏幕上）
+    this.hideProgressNotice();
     // 对象包装：闭包内赋值的变量在 finally 里会被流分析收窄，无法 ?.hide()
     const progress: { notice: Notice | null } = { notice: null };
+    this.progressHolder = progress;
     let lastPaint = 0;
     this.logChain = Promise.resolve();
     // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在
@@ -167,12 +179,12 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
         await this.saveSettings();
       }
       await this.logChain;
-      new Notice(t.noticeBaselineDone(written));
+      new Notice(t.noticeBaselineDone(written), 8000);
     } finally {
       window.clearInterval(heartbeat);
       this.appendLog('rebuild-finally');
       await this.logChain;
-      progress.notice?.hide();
+      this.hideProgressNotice();
       this.baselineRunning = false;
     }
   }

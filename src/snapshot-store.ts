@@ -60,8 +60,8 @@ export class SnapshotStore implements SnapshotStoreLike {
       const tx = this.db.transaction('snapshots', mode);
       const req = run(tx.objectStore('snapshots')) as IDBRequest<T> | undefined;
       tx.oncomplete = () => resolve(req ? req.result : (undefined as unknown as T));
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      tx.onerror = () => reject(tx.error instanceof Error ? tx.error : new Error('IndexedDB transaction failed'));
+      tx.onabort = () => reject(tx.error instanceof Error ? tx.error : new Error('IndexedDB transaction aborted'));
     });
   }
 
@@ -79,7 +79,7 @@ export class SnapshotStore implements SnapshotStoreLike {
     const latest = await this.getLatest(path);
     if (latest && sameContent(latest.data, data)) return false;
     await this.tx('readwrite', s => {
-      s.add({ path, ts, data } as SnapshotRecord);
+      s.add({ path, ts, data });
     });
     return true;
   }

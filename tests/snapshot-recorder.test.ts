@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
+// recorder 默认计时器走 window.setTimeout（见 obsidianmd/prefer-window-timers），jsdom 下 vitest 假计时器会一并补丁
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EventRef, TFile } from 'obsidian';
+import type { EventRef } from 'obsidian';
 import { sameContent } from '../src/diff-engine';
 import type { SnapshotStoreLike } from '../src/snapshot-store';
 import { SnapshotRecorder, runBaselineScan, type RecorderVault } from '../src/snapshot-recorder';
@@ -42,8 +44,9 @@ class MemoryStore implements SnapshotStoreLike {
   close() {}
 }
 
-function mdFile(path: string): TFile {
-  return { path, extension: 'md' } as unknown as TFile;
+/** 结构满足 recorder 所需（path/extension）；事件经假 vault 派发，不依赖 Obsidian 运行时类型 */
+function mdFile(path: string): { path: string; extension: string } {
+  return { path, extension: 'md' };
 }
 
 /** vault 假件：read 返回 content() 的当前值；fire 手动派发事件 */
@@ -174,8 +177,8 @@ describe('SnapshotRecorder', () => {
 
   it('非 md 文件忽略', async () => {
     const { store, env } = setup(() => 'x');
-    env.fire('modify', { path: 'a.png', extension: 'png' } as unknown as TFile);
-    env.fire('modify', { path: 'folder' } as unknown as TFile); // 无 extension（文件夹）
+    env.fire('modify', { path: 'a.png', extension: 'png' });
+    env.fire('modify', { path: 'folder' }); // 无 extension（文件夹）
     await settle();
     expect(store.addCalls).toHaveLength(0);
   });
@@ -208,10 +211,10 @@ describe('runBaselineScan', () => {
     let readCount = 0;
     return {
       vault: {
-        getMarkdownFiles: () => files.map(p => ({ path: p, extension: 'md' } as unknown as TFile)),
+        getMarkdownFiles: () => files.map(p => ({ path: p, extension: 'md' })),
         cachedRead: async (f: unknown) => {
           readCount++;
-          return `content of ${(f as TFile).path}`;
+          return `content of ${(f as { path: string }).path}`;
         },
       } as unknown as Parameters<typeof runBaselineScan>[0],
       readCount: () => readCount,
@@ -257,10 +260,9 @@ describe('runBaselineScan', () => {
   it('单文件读失败跳过，不影响其余文件', async () => {
     const store = new MemoryStore();
     const vault = {
-      getMarkdownFiles: () =>
-        ['ok.md', 'bad.md'].map(p => ({ path: p, extension: 'md' } as unknown as TFile)),
+      getMarkdownFiles: () => ['ok.md', 'bad.md'].map(p => ({ path: p, extension: 'md' })),
       cachedRead: async (f: unknown) => {
-        if ((f as TFile).path === 'bad.md') throw new Error('boom');
+        if ((f as { path: string }).path === 'bad.md') throw new Error('boom');
         return 'x';
       },
     } as unknown as Parameters<typeof runBaselineScan>[0];

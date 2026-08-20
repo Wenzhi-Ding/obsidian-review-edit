@@ -38,11 +38,11 @@ class PurgeConfirmModal extends Modal {
     this.contentEl.createEl('p', { text: t.confirmPurgeBody });
     new Setting(this.contentEl)
       .addButton(b =>
-        b.setButtonText(t.confirmPurgeConfirm)
-          .setWarning()
-          .onClick(() => {
-            void this.host.purgeSnapshots().finally(() => this.close());
-          })
+        // 危险样式 API：setWarning 已弃用、setDestructive 需 1.13（minAppVersion 1.5），
+        // 防误触由本确认弹窗承担，用普通按钮
+        b.setButtonText(t.confirmPurgeConfirm).onClick(() => {
+          void this.host.purgeSnapshots().finally(() => this.close());
+        })
       )
       .addButton(b => b.setButtonText(t.confirmPurgeCancel).onClick(() => this.close()));
   }

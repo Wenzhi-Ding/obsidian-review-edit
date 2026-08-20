@@ -1,17 +1,27 @@
-import type { EventRef, TAbstractFile, TFile, Vault } from 'obsidian';
+import type { EventRef, TAbstractFile, Vault } from 'obsidian';
 import type { SnapshotStoreLike } from './snapshot-store';
 
-type Timer = ReturnType<typeof setTimeout>;
+/** 计时器句柄；DOM 的 window.setTimeout 返回 number（Node 的 clearTimeout 同样接受 number） */
+type Timer = number;
 
-/** vault 的最小依赖面；真实 Vault 结构满足，测试传假件 */
-export type RecorderVault = Pick<Vault, 'on' | 'offref' | 'read'>;
+/**
+ * vault 的最小依赖面；真实 Vault 结构满足（方法参数双变），测试传假件。
+ * 回调按 Events 官方签名收 TAbstractFile；read 只要求 path，便于结构化传参。
+ */
+export interface RecorderVault {
+  on(name: 'modify', cb: (file: TAbstractFile) => unknown): EventRef;
+  on(name: 'create', cb: (file: TAbstractFile) => unknown): EventRef;
+  on(name: 'rename', cb: (file: TAbstractFile, oldPath: string) => unknown): EventRef;
+  offref(ref: EventRef): void;
+  read(file: { path: string }): Promise<string>;
+}
 
 export interface RecorderOptions {
   /** 会话边界阈值，每次事件实时读取（设置页改阈值立即生效） */
-  thresholdMs(): number;
-  now?(): number;
-  setTimeout?(fn: () => void, ms: number): Timer;
-  clearTimeout?(t: Timer): void;
+  thresholdMs: () => number;
+  now?: () => number;
+  setTimeout?: (fn: () => void, ms: number) => Timer;
+  clearTimeout?: (t: Timer) => void;
 }
 
 /**
@@ -38,16 +48,17 @@ export class SnapshotRecorder {
     opts: RecorderOptions
   ) {
     this.now = opts.now ?? (() => Date.now());
-    this.schedule = opts.setTimeout ?? ((fn, ms) => setTimeout(fn, ms));
-    this.cancelTimer = opts.clearTimeout ?? (t => clearTimeout(t));
+    // 双类型环境（DOM + @types/node）下 window.setTimeout 是重载并集，显式标注返回值钉住 DOM 签名
+    this.schedule = opts.setTimeout ?? ((fn, ms): Timer => window.setTimeout(fn, ms));
+    this.cancelTimer = opts.clearTimeout ?? (t => window.clearTimeout(t));
     this.thresholdMs = opts.thresholdMs;
   }
 
   mount(): void {
     this.refs.push(
-      this.vault.on('modify', f => this.onModify(f as TFile)),
-      this.vault.on('create', f => this.onCreate(f as TFile)),
-      this.vault.on('rename', (f, oldPath) => this.onRename(f as TFile, oldPath))
+      this.vault.on('modify', f => this.onModify(f)),
+      this.vault.on('create', f => this.onCreate(f)),
+      this.vault.on('rename', (f, oldPath) => this.onRename(f, oldPath))
     );
   }
 
@@ -72,10 +83,10 @@ export class SnapshotRecorder {
     return next;
   }
 
+  /** modify/create/rename 回调都可能收到 TFolder（无 extension），按结构判断跳过 */
   private onModify(file: TAbstractFile): void {
-    const f = file as TFile;
-    if (f.extension !== 'md') return;
-    const path = f.path;
+    if ((file as { extension?: string }).extension !== 'md') return;
+    const path = file.path;
     const ts = this.now();
     const prev = this.lastModifyTs.get(path);
     this.lastModifyTs.set(path, ts);
@@ -87,7 +98,7 @@ export class SnapshotRecorder {
         if (pre !== undefined) await this.store.add(path, ts, pre);
       }
       try {
-        this.lastKnown.set(path, await this.vault.read(f));
+        this.lastKnown.set(path, await this.vault.read(file));
       } catch {
         /* 文件已删等，跳过 */
       }
@@ -115,14 +126,13 @@ export class SnapshotRecorder {
   }
 
   private onCreate(file: TAbstractFile): void {
-    const f = file as TFile;
-    if (f.extension !== 'md') return;
+    if ((file as { extension?: string }).extension !== 'md') return;
     const ts = this.now();
-    void this.enqueue(f.path, async () => {
+    void this.enqueue(file.path, async () => {
       try {
-        const data = await this.vault.read(f);
-        await this.store.add(f.path, ts, data);
-        this.lastKnown.set(f.path, data);
+        const data = await this.vault.read(file);
+        await this.store.add(file.path, ts, data);
+        this.lastKnown.set(file.path, data);
       } catch {
         /* 忽略 */
       }
@@ -130,21 +140,22 @@ export class SnapshotRecorder {
   }
 
   private onRename(file: TAbstractFile, oldPath: string): void {
-    const f = file as TFile;
-    void this.enqueue(oldPath, () => this.store.migratePath(oldPath, f.path)).then(() => {
+    if ((file as { extension?: string }).extension !== 'md') return;
+    const newPath = file.path;
+    void this.enqueue(oldPath, () => this.store.migratePath(oldPath, newPath)).then(() => {
       const ts = this.lastModifyTs.get(oldPath);
       if (ts !== undefined) {
-        this.lastModifyTs.set(f.path, ts);
+        this.lastModifyTs.set(newPath, ts);
         this.lastModifyTs.delete(oldPath);
       }
       const content = this.lastKnown.get(oldPath);
       if (content !== undefined) {
-        this.lastKnown.set(f.path, content);
+        this.lastKnown.set(newPath, content);
         this.lastKnown.delete(oldPath);
       }
       const t = this.endTimers.get(oldPath);
       if (t !== undefined) {
-        this.endTimers.set(f.path, t);
+        this.endTimers.set(newPath, t);
         this.endTimers.delete(oldPath);
       }
     });
@@ -169,7 +180,7 @@ export async function runBaselineScan(
   opts: BaselineScanOptions = {}
 ): Promise<number> {
   const batchSize = opts.batchSize ?? 200;
-  const yieldControl = opts.yieldControl ?? (() => new Promise<void>(r => setTimeout(r, 0)));
+  const yieldControl = opts.yieldControl ?? (() => new Promise<void>(r => window.setTimeout(r, 0)));
   const shouldContinue = opts.shouldContinue ?? (() => true);
   const now = opts.now ?? Date.now;
   const files = vault.getMarkdownFiles();

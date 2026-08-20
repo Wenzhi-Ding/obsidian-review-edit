@@ -14,6 +14,27 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
   private store: SnapshotStore | null = null;
   private recorder: SnapshotRecorder | null = null;
   private ownStoreErrorNoticed = false;
+  /** 重建快照的诊断日志：写插件目录下 rebuild.log，进程冻死后可从磁盘读取定位停点 */
+  private rebuildLogPath(): string {
+    return `${this.app.vault.configDir}/plugins/review-edit/rebuild.log`;
+  }
+  private logChain: Promise<void> = Promise.resolve();
+
+  /** SettingsHost：设置面板的诊断锚点（按钮点击等事件也进 rebuild.log） */
+  diagLog(line: string): void {
+    this.appendLog(line);
+  }
+
+  private appendLog(line: string): void {
+    // performance.memory 是 Chromium 私有 API，取不到就空串
+    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const heap = mem ? ` heapMB=${Math.round(mem.usedJSHeapSize / 1048576)}` : '';
+    const text = `${new Date().toISOString()} ${line}${heap}\n`;
+    // 链式 append 保证顺序；不阻塞扫描主流程
+    this.logChain = this.logChain
+      .then(() => this.app.vault.adapter.append(this.rebuildLogPath(), text))
+      .then(() => undefined, () => {});
+  }
 
   async onload() {
     await this.loadSettings();
@@ -119,7 +140,12 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     // 对象包装：闭包内赋值的变量在 finally 里会被流分析收窄，无法 ?.hide()
     const progress: { notice: Notice | null } = { notice: null };
     let lastPaint = 0;
+    this.logChain = Promise.resolve();
     try {
+      await this.app.vault.adapter
+        .write(this.rebuildLogPath(), `${new Date().toISOString()} rebuild-start\n`)
+        .catch(() => {});
+      this.appendLog('scan-begin');
       const written = await runBaselineScan(this.app.vault, store, {
         shouldContinue: () => this.settings.ownSnapshotsEnabled && this.store === store,
         onProgress: (done, total) => {
@@ -130,13 +156,18 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
           if (!progress.notice) progress.notice = new Notice(msg, 0);
           else progress.notice.setMessage(msg);
         },
+        onLog: line => this.appendLog(line),
       });
+      this.appendLog(`scan-return written=${written}`);
       if (!this.settings.baselined) {
         this.settings.baselined = true;
         await this.saveSettings();
       }
+      await this.logChain;
       new Notice(t.noticeBaselineDone(written));
     } finally {
+      this.appendLog('rebuild-finally');
+      await this.logChain;
       progress.notice?.hide();
       this.baselineRunning = false;
     }

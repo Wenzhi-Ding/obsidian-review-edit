@@ -25,6 +25,8 @@ export interface SettingsHost {
   disableOwnSnapshots(): void;
   rebuildBaseline(): Promise<void>;
   purgeSnapshots(): Promise<void>;
+  /** 诊断锚点：写入插件目录 rebuild.log（定位全库扫描冻死用） */
+  diagLog(line: string): void;
 }
 
 class PurgeConfirmModal extends Modal {
@@ -103,6 +105,7 @@ export class ReviewEditSettingTab extends PluginSettingTab {
       .setDesc(t.settingBaselineDesc)
       .addButton(b =>
         b.setButtonText(t.settingBaselineName).onClick(() => {
+          this.plugin.diagLog('settings-button-clicked');
           b.setDisabled(true);
           void this.plugin.rebuildBaseline().finally(() => b.setDisabled(false));
         })

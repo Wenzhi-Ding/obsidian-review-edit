@@ -169,6 +169,8 @@ export interface BaselineScanOptions {
   now?: () => number;
   /** 每处理完一个文件回报累计进度（done 为已处理文件数）；通知侧自行节流重绘 */
   onProgress?: (done: number, total: number) => void;
+  /** 诊断日志回调（扫描起止 + 每 25 个文件的进度与耗时）；调用方写入外部文件，进程冻死后可从磁盘读取定位 */
+  onLog?: (line: string) => void;
 }
 
 /** 扫描的 vault 依赖面：直读磁盘（adapter.read），绕开 cachedRead 的冷读开销 */
@@ -197,9 +199,17 @@ export async function runBaselineScan(
   const files = vault.getMarkdownFiles();
   let written = 0;
   let done = 0;
+  let lastReadMs = 0;
+  let lastStoreMs = 0;
+  let maxReadMs = 0;
+  let maxStoreMs = 0;
+  opts.onLog?.(`scan-start files=${files.length} batchSize=${batchSize}`);
   for (let i = 0; i < files.length; i += batchSize) {
     for (const f of files.slice(i, i + batchSize)) {
-      if (!shouldContinue()) return written;
+      if (!shouldContinue()) {
+        opts.onLog?.(`scan-abort done=${done}`);
+        return written;
+      }
       const tRead = now();
       let content: string;
       try {
@@ -221,10 +231,22 @@ export async function runBaselineScan(
       if (readMs + storeMs > SLOW_FILE_MS) {
         console.warn(`[review-edit] snapshot rebuild slow file: ${f.path} (read ${readMs}ms, store ${storeMs}ms)`);
       }
+      lastReadMs = readMs;
+      lastStoreMs = storeMs;
+      if (readMs > maxReadMs) maxReadMs = readMs;
+      if (storeMs > maxStoreMs) maxStoreMs = storeMs;
       done++;
+      if (done % 25 === 0) {
+        opts.onLog?.(
+          `f=${done}/${files.length} last=${f.path} readMs=${lastReadMs} storeMs=${lastStoreMs} maxReadMs=${maxReadMs} maxStoreMs=${maxStoreMs}`
+        );
+        maxReadMs = 0;
+        maxStoreMs = 0;
+      }
       opts.onProgress?.(done, files.length);
     }
     await yieldControl();
   }
+  opts.onLog?.(`scan-end written=${written}`);
   return written;
 }

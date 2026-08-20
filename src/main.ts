@@ -144,8 +144,9 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在
     const heartbeat = window.setInterval(() => this.appendLog('heartbeat'), 5000);
     try {
+      // 追加而非清空：冻死那次运行的日志要保留到事后取证，不被下次运行覆盖（诊断期）
       await this.app.vault.adapter
-        .write(this.rebuildLogPath(), `${new Date().toISOString()} rebuild-start\n`)
+        .append(this.rebuildLogPath(), `\n${new Date().toISOString()} rebuild-start\n`)
         .catch(() => {});
       this.appendLog('scan-begin');
       const written = await runBaselineScan(this.app.vault, store, {

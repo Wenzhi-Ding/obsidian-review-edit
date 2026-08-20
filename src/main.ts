@@ -141,6 +141,8 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     const progress: { notice: Notice | null } = { notice: null };
     let lastPaint = 0;
     this.logChain = Promise.resolve();
+    // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在
+    const heartbeat = window.setInterval(() => this.appendLog('heartbeat'), 5000);
     try {
       await this.app.vault.adapter
         .write(this.rebuildLogPath(), `${new Date().toISOString()} rebuild-start\n`)
@@ -166,6 +168,7 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
       await this.logChain;
       new Notice(t.noticeBaselineDone(written));
     } finally {
+      window.clearInterval(heartbeat);
       this.appendLog('rebuild-finally');
       await this.logChain;
       progress.notice?.hide();

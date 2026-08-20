@@ -245,6 +245,7 @@ export async function runBaselineScan(
       }
       opts.onProgress?.(done, files.length);
     }
+    opts.onLog?.(`batch-done done=${done}`);
     await yieldControl();
   }
   opts.onLog?.(`scan-end written=${written}`);

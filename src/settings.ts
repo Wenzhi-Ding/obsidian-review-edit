@@ -59,6 +59,8 @@ export class ReviewEditSettingTab extends PluginSettingTab {
     const t = uiStrings();
     const { containerEl } = this;
     containerEl.empty();
+    // 若设置页被反复重渲染，rebuild.log 会堆满本行——直接暴露渲染风暴
+    this.plugin.diagLog('settings-display');
 
     new Setting(containerEl).setName(t.settingsOwnSnapshotsSection).setHeading();
 

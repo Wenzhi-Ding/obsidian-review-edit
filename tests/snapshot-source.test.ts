@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
-import { filterDiffering, getSnapshots, SnapshotSourceUnavailableError } from '../src/snapshot-source';
+import type { SnapshotStoreLike } from '../src/snapshot-store';
+import {
+  dedupeAdjacent,
+  filterDiffering,
+  getMergedSnapshots,
+  getSnapshots,
+  SnapshotSourceUnavailableError,
+} from '../src/snapshot-source';
 
 function mockDb(records: Array<{ path: string; ts: number; data: string }>, withPathIndex = true) {
   return {
@@ -48,6 +55,90 @@ describe('getSnapshots', () => {
   it('IndexedDB 抛错时原样向上抛出', async () => {
     const db = { transaction: () => { throw new Error('boom'); } };
     await expect(getSnapshots(mockApp(db), 'a.md')).rejects.toThrow('boom');
+  });
+});
+
+function mockStore(
+  entries: Array<{ path: string; ts: number; data: string }>,
+  fail = false
+): SnapshotStoreLike {
+  return {
+    getLatest: async p => entries.filter(e => e.path === p).sort((a, b) => b.ts - a.ts)[0] ?? null,
+    getEntries: async p =>
+      fail
+        ? Promise.reject(new Error('own boom'))
+        : Promise.resolve(
+            entries.filter(e => e.path === p).sort((a, b) => b.ts - a.ts).map(({ ts, data }) => ({ ts, data }))
+          ),
+    add: async () => false,
+    migratePath: async () => {},
+    pruneRetention: async () => 0,
+    purge: async () => {},
+    close: () => {},
+  };
+}
+
+describe('dedupeAdjacent', () => {
+  it('相邻同内容只留最新，跨源合并用同一口径（含换行风格差异）', () => {
+    expect(
+      dedupeAdjacent([
+        { ts: 300, data: 'v2' },
+        { ts: 280, data: 'v2' },
+        { ts: 270, data: 'v2\r\n' },
+        { ts: 100, data: 'v1' },
+      ])
+    ).toEqual([
+      { ts: 300, data: 'v2' },
+      { ts: 100, data: 'v1' },
+    ]);
+  });
+});
+
+describe('getMergedSnapshots', () => {
+  it('两源按时间倒序合并并去重相邻同内容', async () => {
+    const fr = mockApp(
+      mockDb([
+        { path: 'a.md', ts: 100, data: 'v1' },
+        { path: 'a.md', ts: 400, data: 'v3' },
+      ])
+    );
+    const own = mockStore([{ path: 'a.md', ts: 200, data: 'v2' }]);
+    expect(await getMergedSnapshots(fr, 'a.md', own)).toEqual([
+      { ts: 400, data: 'v3' },
+      { ts: 200, data: 'v2' },
+      { ts: 100, data: 'v1' },
+    ]);
+  });
+
+  it('自建库读失败：返回 file-recovery 条目并回调 onOwnStoreError', async () => {
+    const onErr = vi.fn();
+    const fr = mockApp(mockDb([{ path: 'a.md', ts: 100, data: 'v1' }]));
+    expect(await getMergedSnapshots(fr, 'a.md', mockStore([], true), onErr)).toEqual([
+      { ts: 100, data: 'v1' },
+    ]);
+    expect(onErr).toHaveBeenCalledTimes(1);
+  });
+
+  it('file-recovery 不可用但自建库可用（含为空）：返回自建条目，不抛错', async () => {
+    const noFr = { internalPlugins: { getEnabledPluginById: () => null } } as unknown as App;
+    expect(await getMergedSnapshots(noFr, 'a.md', mockStore([{ path: 'a.md', ts: 1, data: 'x' }]))).toEqual([
+      { ts: 1, data: 'x' },
+    ]);
+    expect(await getMergedSnapshots(noFr, 'a.md', mockStore([]))).toEqual([]);
+  });
+
+  it('两源都失败抛 SnapshotSourceUnavailableError', async () => {
+    const noFr = { internalPlugins: { getEnabledPluginById: () => null } } as unknown as App;
+    await expect(getMergedSnapshots(noFr, 'a.md', mockStore([], true))).rejects.toBeInstanceOf(
+      SnapshotSourceUnavailableError
+    );
+  });
+
+  it('store 为 null（功能关闭）时行为与旧 getSnapshots 一致：不可用即抛错', async () => {
+    const noFr = { internalPlugins: { getEnabledPluginById: () => null } } as unknown as App;
+    await expect(getMergedSnapshots(noFr, 'a.md', null)).rejects.toBeInstanceOf(
+      SnapshotSourceUnavailableError
+    );
   });
 });
 

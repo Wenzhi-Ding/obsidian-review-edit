@@ -1,5 +1,6 @@
 import type { App } from 'obsidian';
 import { sameContent } from './diff-engine';
+import type { SnapshotStoreLike } from './snapshot-store';
 
 export interface SnapshotEntry {
   ts: number;
@@ -56,10 +57,14 @@ export async function getSnapshots(app: App, path: string): Promise<SnapshotEntr
   }
 
   backups.sort((a, b) => b.ts - a.ts);
-  // 相邻内容相同只保留最新一条，减少选择器噪音
+  return dedupeAdjacent(backups.map(b => ({ ts: b.ts, data: b.data })));
+}
+
+/** 相邻内容相同只保留最新一条，减少选择器噪音；「相同」按 diff 引擎口径 */
+export function dedupeAdjacent(entries: SnapshotEntry[]): SnapshotEntry[] {
   const out: SnapshotEntry[] = [];
-  for (const b of backups) {
-    if (out.length === 0 || out[out.length - 1].data !== b.data) out.push({ ts: b.ts, data: b.data });
+  for (const e of entries) {
+    if (out.length === 0 || !sameContent(out[out.length - 1].data, e.data)) out.push(e);
   }
   return out;
 }
@@ -72,4 +77,36 @@ export async function getSnapshots(app: App, path: string): Promise<SnapshotEntr
  */
 export function filterDiffering(entries: SnapshotEntry[], current: string): SnapshotEntry[] {
   return entries.filter(e => !sameContent(e.data, current));
+}
+
+/**
+ * 合并自建快照库与 file-recovery 两源，按时间倒序去重相邻同内容。
+ * 失败语义：file-recovery 不可用则静默降级；自建库读失败回调 onOwnStoreError 后降级；
+ * 两者都拿不到数据才抛 SnapshotSourceUnavailableError。
+ */
+export async function getMergedSnapshots(
+  app: App,
+  path: string,
+  store: SnapshotStoreLike | null,
+  onOwnStoreError?: () => void
+): Promise<SnapshotEntry[]> {
+  let own: SnapshotEntry[] = [];
+  let ownFailed = false;
+  if (store) {
+    try {
+      own = await store.getEntries(path);
+    } catch {
+      ownFailed = true;
+      onOwnStoreError?.();
+    }
+  }
+  let fr: SnapshotEntry[] = [];
+  let frFailed = false;
+  try {
+    fr = await getSnapshots(app, path);
+  } catch {
+    frFailed = true;
+  }
+  if (frFailed && (ownFailed || !store)) throw new SnapshotSourceUnavailableError();
+  return dedupeAdjacent([...own, ...fr].sort((a, b) => b.ts - a.ts));
 }

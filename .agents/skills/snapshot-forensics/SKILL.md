@@ -15,5 +15,7 @@ description: "排查 review-edit 插件读取的 file-recovery 快照数据问�
 4. 取证用**字节模式搜索**而非窗口解码：UTF-16 关键词要转成 `'C\0o\0l\0d\0'` 形式再搜；`subarray(任意偏移).toString('utf16le')` 受起始奇偶影响不可靠（必要时候偶偏移各解一次交叉验证）。
 5. `.ldb` 块可能 snappy 压缩，明文 grep 命中率不定；`.log`（最新记录）通常未压缩。明文 grep 无命中**不能**下「不存在」结论。
 6. 对照 vault 文件系统核实当前内容、换行风格与路径（文件可能被移动或有同名副本；Zotero 导入笔记常整篇 CRLF）。
+7. **判定 store 名/库结构时，先 grep 官方代码而不是从 leveldb 字节反推**：Obsidian 安装目录 `resources/obsidian.asar` 是明文 JS bundle，可直接字节搜索 `Zw(this.app.appId+"-backup"` 附近的 file-recovery 代码（建库、store、索引定义都在）。陷阱：数据库名是 `<appId>-backup`（如 `c764249c746a28ca-backup`），其中包含子串 `ca-backup`——grep `ca-backup` 命中的全是**数据库名**而非 store 名；store 名一直是 `backups`（带 `path`/`ts` 索引）。2026-08-20 有会话据该子串误判 store 改名并提议改插件，asar 取证证伪。
+8. 运行时句柄：`app.internalPlugins.getEnabledPluginById('file-recovery')` 即插件实例，`.db.name` 返回 `<appId>-backup` 可直接确认连接目标；`forceAdd(path, content)` 绕过节流无条件立即写一条快照（经 `obsidian eval` 调用，用于外部编辑前打基线，见 note skill）。
 
-Session evidence: 2026-08-17 DeFi Security「无差异」排查：三步弯路后字节扫描解出全部 6 条备份记录的时间戳与内容，确认快照序列与用户认知一致。
+Session evidence: 2026-08-17 DeFi Security「无差异」排查：三步弯路后字节扫描解出全部 6 条备份记录的时间戳与内容，确认快照序列与用户认知一致。2026-08-20 快照缺报关联排查：35 个文件批量外部编辑全部无快照，确认外部编辑对从未打开的文件不触发写入；同日以 asar 代码 + forceAdd 落库实验闭环验证（两个从未打开的文件 eval 后记录立即出现在 002360.log）。

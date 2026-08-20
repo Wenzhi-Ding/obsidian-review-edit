@@ -27,6 +27,8 @@ export interface SettingsHost {
   purgeSnapshots(): Promise<void>;
   /** 诊断锚点：写入插件目录 rebuild.log（定位全库扫描冻死用） */
   diagLog(line: string): void;
+  /** 设置页注入的进度显示回调：重建进行中按钮文本实时更新；null 恢复原文本 */
+  onBaselineProgressUI: ((text: string | null) => void) | null;
 }
 
 class PurgeConfirmModal extends Modal {
@@ -67,6 +69,10 @@ export class ReviewEditSettingTab extends PluginSettingTab {
       this.plugin.diagLog('display-error: ' + (e instanceof Error ? e.message : String(e)));
       throw e;
     }
+  }
+
+  onClose(): void {
+    this.plugin.onBaselineProgressUI = null;
   }
 
   private render(): void {
@@ -127,6 +133,10 @@ export class ReviewEditSettingTab extends PluginSettingTab {
         });
         // 诊断锚点：不依赖文本匹配即可从 DOM 定位本按钮（eval 复现/截图标注用）
         b.buttonEl.addClass('review-edit-rebuild-btn');
+        // 进度直接显示在按钮上，不弹常驻通知（悬浮通知在主窗口的行为是冻死嫌疑对象）
+        this.plugin.onBaselineProgressUI = text => {
+          b.setButtonText(text ?? t.settingBaselineName);
+        };
       })
 
     new Setting(containerEl)

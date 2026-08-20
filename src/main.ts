@@ -17,6 +17,8 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
   /** 当前常驻进度通知的持有者；重建结束/插件卸载时清理，防止残留。
    *  用对象包装而非直接持有 Notice：闭包内赋值的属性在 finally 里不会被流分析收窄。 */
   private progressHolder: { notice: Notice | null } | null = null;
+  /** SettingsHost：设置页注入的进度回调；设置页关闭时置回 null（改走通知兜底） */
+  onBaselineProgressUI: ((text: string | null) => void) | null = null;
 
   private hideProgressNotice(): void {
     this.progressHolder?.notice?.hide();
@@ -171,7 +173,8 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
           if (done !== total && Date.now() - lastPaint < 250) return;
           lastPaint = Date.now();
           const msg = t.noticeBaselineProgress(done, total);
-          if (!progress.notice) progress.notice = new Notice(msg, 0);
+          if (this.onBaselineProgressUI) this.onBaselineProgressUI(msg);
+          else if (!progress.notice) progress.notice = new Notice(msg, 0);
           else progress.notice.setMessage(msg);
         },
         onLog: line => this.appendLog(line),
@@ -188,6 +191,7 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
       this.appendLog('rebuild-finally');
       await this.logChain;
       this.appendLog('hiding-progress');
+      this.onBaselineProgressUI?.(null);
       this.hideProgressNotice();
       this.appendLog('progress-hidden');
       this.baselineRunning = false;

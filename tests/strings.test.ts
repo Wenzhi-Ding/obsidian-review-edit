@@ -71,7 +71,12 @@ describe('自动快照设置文案', () => {
   });
 
   it('noticeBaselineDone 带条数插值', () => {
-    expect(stringsForLocale('zh-cn').noticeBaselineDone(42)).toBe('基线完成：写入 42 条快照');
-    expect(stringsForLocale('en').noticeBaselineDone(42)).toBe('Baseline complete: 42 snapshots written');
+    expect(stringsForLocale('zh-cn').noticeBaselineDone(42)).toBe('重建快照完成：写入 42 条');
+    expect(stringsForLocale('en').noticeBaselineDone(42)).toBe('Snapshot rebuild complete: 42 snapshots written');
+  });
+
+  it('noticeBaselineProgress 带进度插值', () => {
+    expect(stringsForLocale('zh-cn').noticeBaselineProgress(3, 10)).toBe('正在重建快照：3/10');
+    expect(stringsForLocale('en').noticeBaselineProgress(3, 10)).toBe('Rebuilding snapshots: 3/10');
   });
 });

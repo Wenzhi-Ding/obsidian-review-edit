@@ -102,7 +102,10 @@ export class ReviewEditSettingTab extends PluginSettingTab {
       .setName(t.settingBaselineName)
       .setDesc(t.settingBaselineDesc)
       .addButton(b =>
-        b.setButtonText(t.settingBaselineName).onClick(() => void this.plugin.rebuildBaseline())
+        b.setButtonText(t.settingBaselineName).onClick(() => {
+          b.setDisabled(true);
+          void this.plugin.rebuildBaseline().finally(() => b.setDisabled(false));
+        })
       );
 
     new Setting(containerEl)

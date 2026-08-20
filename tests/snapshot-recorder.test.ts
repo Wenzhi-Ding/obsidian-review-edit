@@ -257,6 +257,18 @@ describe('runBaselineScan', () => {
     expect(store.entries).toHaveLength(2);
   });
 
+  it('onProgress 按批回报累计进度', async () => {
+    const store = new MemoryStore();
+    const { vault } = scanVault(['a.md', 'b.md', 'c.md', 'd.md', 'e.md']);
+    const calls: string[] = [];
+    await runBaselineScan(vault, store, {
+      batchSize: 2,
+      yieldControl: async () => {},
+      onProgress: (done, total) => calls.push(`${done}/${total}`),
+    });
+    expect(calls).toEqual(['2/5', '4/5', '5/5']);
+  });
+
   it('单文件读失败跳过，不影响其余文件', async () => {
     const store = new MemoryStore();
     const vault = {

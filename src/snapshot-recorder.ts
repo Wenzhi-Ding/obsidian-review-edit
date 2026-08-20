@@ -167,6 +167,8 @@ export interface BaselineScanOptions {
   yieldControl?: () => Promise<void>;
   shouldContinue?: () => boolean;
   now?: () => number;
+  /** 每批完成时回报累计进度（done 为已处理文件数） */
+  onProgress?: (done: number, total: number) => void;
 }
 
 /**
@@ -194,6 +196,7 @@ export async function runBaselineScan(
         /* 单文件失败跳过 */
       }
     }
+    opts.onProgress?.(Math.min(i + batchSize, files.length), files.length);
     await yieldControl();
   }
   return written;

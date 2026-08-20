@@ -108,18 +108,34 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     this.recorder = null;
   }
 
-  /** SettingsHost：手动/首次基线 */
+  /** SettingsHost：手动/首次全量快照（原「基线」）；常驻通知回报进度 */
+  private baselineRunning = false;
+
   async rebuildBaseline(): Promise<void> {
     const store = this.store;
-    if (!store) return;
-    const written = await runBaselineScan(this.app.vault, store, {
-      shouldContinue: () => this.settings.ownSnapshotsEnabled && this.store === store,
-    });
-    if (!this.settings.baselined) {
-      this.settings.baselined = true;
-      await this.saveSettings();
+    if (!store || this.baselineRunning) return;
+    this.baselineRunning = true;
+    const t = uiStrings();
+    // 对象包装：闭包内赋值的变量在 finally 里会被流分析收窄，无法 ?.hide()
+    const progress: { notice: Notice | null } = { notice: null };
+    try {
+      const written = await runBaselineScan(this.app.vault, store, {
+        shouldContinue: () => this.settings.ownSnapshotsEnabled && this.store === store,
+        onProgress: (done, total) => {
+          const msg = t.noticeBaselineProgress(done, total);
+          if (!progress.notice) progress.notice = new Notice(msg, 0);
+          else progress.notice.setMessage(msg);
+        },
+      });
+      if (!this.settings.baselined) {
+        this.settings.baselined = true;
+        await this.saveSettings();
+      }
+      new Notice(t.noticeBaselineDone(written));
+    } finally {
+      progress.notice?.hide();
+      this.baselineRunning = false;
     }
-    new Notice(uiStrings().noticeBaselineDone(written));
   }
 
   /** SettingsHost：清除全部自建快照（不动 baselined——重建由用户显式触发） */

@@ -212,9 +212,11 @@ describe('runBaselineScan', () => {
     return {
       vault: {
         getMarkdownFiles: () => files.map(p => ({ path: p, extension: 'md' })),
-        cachedRead: async (f: unknown) => {
-          readCount++;
-          return `content of ${(f as { path: string }).path}`;
+        adapter: {
+          read: async (p: string) => {
+            readCount++;
+            return `content of ${p}`;
+          },
         },
       } as unknown as Parameters<typeof runBaselineScan>[0],
       readCount: () => readCount,
@@ -257,7 +259,7 @@ describe('runBaselineScan', () => {
     expect(store.entries).toHaveLength(2);
   });
 
-  it('onProgress 按批回报累计进度', async () => {
+  it('onProgress 逐文件回报累计进度', async () => {
     const store = new MemoryStore();
     const { vault } = scanVault(['a.md', 'b.md', 'c.md', 'd.md', 'e.md']);
     const calls: string[] = [];
@@ -266,18 +268,22 @@ describe('runBaselineScan', () => {
       yieldControl: async () => {},
       onProgress: (done, total) => calls.push(`${done}/${total}`),
     });
-    expect(calls).toEqual(['2/5', '4/5', '5/5']);
+    expect(calls).toEqual(['1/5', '2/5', '3/5', '4/5', '5/5']);
   });
 
-  it('单文件读失败跳过，不影响其余文件', async () => {
+  it('单文件读失败跳过，不影响其余文件与进度计数', async () => {
     const store = new MemoryStore();
     const vault = {
       getMarkdownFiles: () => ['ok.md', 'bad.md'].map(p => ({ path: p, extension: 'md' })),
-      cachedRead: async (f: unknown) => {
-        if ((f as { path: string }).path === 'bad.md') throw new Error('boom');
-        return 'x';
+      adapter: {
+        read: async (p: string) => {
+          if (p === 'bad.md') throw new Error('boom');
+          return 'x';
+        },
       },
     } as unknown as Parameters<typeof runBaselineScan>[0];
-    expect(await runBaselineScan(vault, store)).toBe(1);
+    const calls: string[] = [];
+    expect(await runBaselineScan(vault, store, { onProgress: d => calls.push(String(d)) })).toBe(1);
+    expect(calls).toEqual(['1', '2']);
   });
 });

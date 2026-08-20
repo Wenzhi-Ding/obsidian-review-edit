@@ -1,4 +1,4 @@
-import type { EventRef, TAbstractFile, Vault } from 'obsidian';
+import type { EventRef, TAbstractFile, TFile } from 'obsidian';
 import type { SnapshotStoreLike } from './snapshot-store';
 
 /** 计时器句柄；DOM 的 window.setTimeout 返回 number（Node 的 clearTimeout 同样接受 number） */
@@ -167,17 +167,26 @@ export interface BaselineScanOptions {
   yieldControl?: () => Promise<void>;
   shouldContinue?: () => boolean;
   now?: () => number;
-  /** 每批完成时回报累计进度（done 为已处理文件数） */
+  /** 每处理完一个文件回报累计进度（done 为已处理文件数）；通知侧自行节流重绘 */
   onProgress?: (done: number, total: number) => void;
 }
 
+/** 扫描的 vault 依赖面：直读磁盘（adapter.read），绕开 cachedRead 的冷读开销 */
+export interface BaselineVault {
+  getMarkdownFiles(): TFile[];
+  adapter: { read(normalizedPath: string): Promise<string> };
+}
+
+/** 单文件读写总耗时超过该值时写控制台日志，用于定位拖慢全库扫描的文件 */
+const SLOW_FILE_MS = 200;
+
 /**
- * 全库基线扫描：为每个 md 文件写一条当前内容快照。
+ * 全库快照扫描：为每个 md 文件写一条当前内容快照。
  * 内容未变化的文件被 add 的去重闸门跳过，重跑天然增量。
  * 分批执行、批间让出主线程，避免大 vault 卡顿。
  */
 export async function runBaselineScan(
-  vault: Pick<Vault, 'getMarkdownFiles' | 'cachedRead'>,
+  vault: BaselineVault,
   store: SnapshotStoreLike,
   opts: BaselineScanOptions = {}
 ): Promise<number> {
@@ -187,16 +196,34 @@ export async function runBaselineScan(
   const now = opts.now ?? Date.now;
   const files = vault.getMarkdownFiles();
   let written = 0;
+  let done = 0;
   for (let i = 0; i < files.length; i += batchSize) {
     for (const f of files.slice(i, i + batchSize)) {
       if (!shouldContinue()) return written;
+      const tRead = now();
+      let content: string;
       try {
-        if (await store.add(f.path, now(), await vault.cachedRead(f))) written++;
+        content = await vault.adapter.read(f.path);
       } catch {
-        /* 单文件失败跳过 */
+        /* 单文件读失败跳过 */
+        done++;
+        opts.onProgress?.(done, files.length);
+        continue;
       }
+      const readMs = now() - tRead;
+      const tStore = now();
+      try {
+        if (await store.add(f.path, now(), content)) written++;
+      } catch {
+        /* 单文件写失败跳过 */
+      }
+      const storeMs = now() - tStore;
+      if (readMs + storeMs > SLOW_FILE_MS) {
+        console.warn(`[review-edit] snapshot rebuild slow file: ${f.path} (read ${readMs}ms, store ${storeMs}ms)`);
+      }
+      done++;
+      opts.onProgress?.(done, files.length);
     }
-    opts.onProgress?.(Math.min(i + batchSize, files.length), files.length);
     await yieldControl();
   }
   return written;

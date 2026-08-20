@@ -118,10 +118,14 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     const t = uiStrings();
     // 对象包装：闭包内赋值的变量在 finally 里会被流分析收窄，无法 ?.hide()
     const progress: { notice: Notice | null } = { notice: null };
+    let lastPaint = 0;
     try {
       const written = await runBaselineScan(this.app.vault, store, {
         shouldContinue: () => this.settings.ownSnapshotsEnabled && this.store === store,
         onProgress: (done, total) => {
+          // 逐文件回调、按 250ms 节流重绘；最后一个文件强制刷新
+          if (done !== total && Date.now() - lastPaint < 250) return;
+          lastPaint = Date.now();
           const msg = t.noticeBaselineProgress(done, total);
           if (!progress.notice) progress.notice = new Notice(msg, 0);
           else progress.notice.setMessage(msg);

@@ -153,8 +153,11 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     this.progressHolder = progress;
     let lastPaint = 0;
     this.logChain = Promise.resolve();
-    // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在
+    // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在。
+    // 保留到结束后 35 秒——两次实测的堵死都发生在扫描末尾/收尾窗口，覆盖完整嫌疑区间。
     const heartbeat = window.setInterval(() => this.appendLog('heartbeat'), 5000);
+    this.registerInterval(heartbeat);
+    this.registerInterval(window.setTimeout(() => window.clearInterval(heartbeat), 35_000));
     try {
       // 追加而非清空：冻死那次运行的日志要保留到事后取证，不被下次运行覆盖（诊断期）
       await this.app.vault.adapter
@@ -179,13 +182,21 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
         await this.saveSettings();
       }
       await this.logChain;
+      this.appendLog('completion-notice-next');
       new Notice(t.noticeBaselineDone(written), 8000);
     } finally {
-      window.clearInterval(heartbeat);
       this.appendLog('rebuild-finally');
       await this.logChain;
+      this.appendLog('hiding-progress');
       this.hideProgressNotice();
+      this.appendLog('progress-hidden');
       this.baselineRunning = false;
+      // 存活探针：结束后主线程仍活着才会打出这些行——堵死后日志止于探针之前
+      for (const d of [2000, 5000, 10000, 30000]) {
+        this.registerInterval(
+          window.setTimeout(() => this.appendLog(`alive +${d / 1000}s`), d)
+        );
+      }
     }
   }
 

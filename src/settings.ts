@@ -109,7 +109,10 @@ export class ReviewEditSettingTab extends PluginSettingTab {
         b.setButtonText(t.settingBaselineName).onClick(() => {
           this.plugin.diagLog('settings-button-clicked');
           b.setDisabled(true);
-          void this.plugin.rebuildBaseline().finally(() => b.setDisabled(false));
+          void this.plugin.rebuildBaseline().finally(() => {
+            b.setDisabled(false);
+            this.plugin.diagLog('button-reenabled');
+          });
         })
       );
 

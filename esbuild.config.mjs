@@ -8,6 +8,8 @@ const context = await esbuild.context({
   banner: { js: "/* 由 review-edit 构建生成 */" },
   entryPoints: ["src/main.ts"],
   bundle: true,
+  // 生产构建剔除诊断代码（见 src/diag.ts）；dev 保留完整排障能力
+  define: { __DIAG__: prod ? "false" : "true" },
   external: [
     "obsidian",
     "electron",

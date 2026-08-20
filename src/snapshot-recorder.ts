@@ -1,4 +1,5 @@
 import type { EventRef, TAbstractFile, TFile } from 'obsidian';
+
 import type { SnapshotStoreLike } from './snapshot-store';
 
 /** 计时器句柄；DOM 的 window.setTimeout 返回 number（Node 的 clearTimeout 同样接受 number） */
@@ -20,8 +21,6 @@ export interface RecorderOptions {
   /** 会话边界阈值，每次事件实时读取（设置页改阈值立即生效） */
   thresholdMs: () => number;
   now?: () => number;
-  setTimeout?: (fn: () => void, ms: number) => Timer;
-  clearTimeout?: (t: Timer) => void;
 }
 
 /**
@@ -49,8 +48,8 @@ export class SnapshotRecorder {
   ) {
     this.now = opts.now ?? (() => Date.now());
     // 双类型环境（DOM + @types/node）下 window.setTimeout 是重载并集，显式标注返回值钉住 DOM 签名
-    this.schedule = opts.setTimeout ?? ((fn, ms): Timer => window.setTimeout(fn, ms));
-    this.cancelTimer = opts.clearTimeout ?? (t => window.clearTimeout(t));
+    this.schedule = (fn, ms): Timer => window.setTimeout(fn, ms);
+    this.cancelTimer = (t: Timer) => window.clearTimeout(t);
     this.thresholdMs = opts.thresholdMs;
   }
 
@@ -166,7 +165,6 @@ export interface BaselineScanOptions {
   batchSize?: number;
   yieldControl?: () => Promise<void>;
   shouldContinue?: () => boolean;
-  now?: () => number;
   /** 每处理完一个文件回报累计进度（done 为已处理文件数）；通知侧自行节流重绘 */
   onProgress?: (done: number, total: number) => void;
   /** 诊断日志回调（扫描起止 + 每 25 个文件的进度与耗时）；调用方写入外部文件，进程冻死后可从磁盘读取定位 */
@@ -195,7 +193,6 @@ export async function runBaselineScan(
   const batchSize = opts.batchSize ?? 200;
   const yieldControl = opts.yieldControl ?? (() => new Promise<void>(r => window.setTimeout(r, 0)));
   const shouldContinue = opts.shouldContinue ?? (() => true);
-  const now = opts.now ?? Date.now;
   const files = vault.getMarkdownFiles();
   let written = 0;
   let done = 0;
@@ -210,7 +207,7 @@ export async function runBaselineScan(
         opts.onLog?.(`scan-abort done=${done}`);
         return written;
       }
-      const tRead = now();
+      const tRead = Date.now();
       let content: string;
       try {
         content = await vault.adapter.read(f.path);
@@ -220,15 +217,15 @@ export async function runBaselineScan(
         opts.onProgress?.(done, files.length);
         continue;
       }
-      const readMs = now() - tRead;
-      const tStore = now();
+      const readMs = Date.now() - tRead;
+      const tStore = Date.now();
       try {
-        if (await store.add(f.path, now(), content)) written++;
+        if (await store.add(f.path, Date.now(), content)) written++;
       } catch {
         /* 单文件写失败跳过 */
       }
-      const storeMs = now() - tStore;
-      if (readMs + storeMs > SLOW_FILE_MS) {
+      const storeMs = Date.now() - tStore;
+      if (__DIAG__ && readMs + storeMs > SLOW_FILE_MS) {
         console.warn(`[review-edit] snapshot rebuild slow file: ${f.path} (read ${readMs}ms, store ${storeMs}ms)`);
       }
       lastReadMs = readMs;

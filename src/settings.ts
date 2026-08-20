@@ -1,5 +1,6 @@
 import type { App, Plugin } from 'obsidian';
 import { Modal, PluginSettingTab, Setting } from 'obsidian';
+
 import { uiStrings } from './strings';
 
 export interface ReviewEditSettings {
@@ -61,12 +62,12 @@ export class ReviewEditSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     // 若设置页被反复重渲染，rebuild.log 会堆满本行——直接暴露渲染风暴
-    this.plugin.diagLog('settings-display');
+    if (__DIAG__) this.plugin.diagLog('settings-display');
     try {
       this.render();
-      this.plugin.diagLog('display-ok attached=' + containerEl.isConnected);
+      if (__DIAG__) this.plugin.diagLog('display-ok attached=' + containerEl.isConnected);
     } catch (e) {
-      this.plugin.diagLog('display-error: ' + (e instanceof Error ? e.message : String(e)));
+      if (__DIAG__) this.plugin.diagLog('display-error: ' + (e instanceof Error ? e.message : String(e)));
       throw e;
     }
   }
@@ -124,15 +125,15 @@ export class ReviewEditSettingTab extends PluginSettingTab {
       .setDesc(t.settingBaselineDesc)
       .addButton(b => {
         b.setButtonText(t.settingBaselineName).onClick(() => {
-          this.plugin.diagLog('settings-button-clicked');
+          if (__DIAG__) this.plugin.diagLog('settings-button-clicked');
           b.setDisabled(true);
           void this.plugin.rebuildBaseline().finally(() => {
             b.setDisabled(false);
-            this.plugin.diagLog('button-reenabled');
+            if (__DIAG__) this.plugin.diagLog('button-reenabled');
           });
         });
         // 诊断锚点：不依赖文本匹配即可从 DOM 定位本按钮（eval 复现/截图标注用）
-        b.buttonEl.addClass('review-edit-rebuild-btn');
+        if (__DIAG__) b.buttonEl.addClass('review-edit-rebuild-btn');
         // 进度直接显示在按钮上，不弹常驻通知（悬浮通知在主窗口的行为是冻死嫌疑对象）
         this.plugin.onBaselineProgressUI = text => {
           b.setButtonText(text ?? t.settingBaselineName);

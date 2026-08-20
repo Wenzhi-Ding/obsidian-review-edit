@@ -21,6 +21,8 @@ export default defineConfig(
     languageOptions: {
       globals: {
         ...globals.browser,
+        // 构建期诊断开关（见 src/diag.ts），esbuild/vitest 注入
+        __DIAG__: 'readonly',
       },
       parserOptions: {
         projectService: {

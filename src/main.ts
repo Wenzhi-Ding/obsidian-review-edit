@@ -1,4 +1,5 @@
 import { MarkdownView, Notice, Plugin, setIcon, TFile } from 'obsidian';
+
 import { diffExtension, readonlyCompartment } from './cm-extension';
 import { DiffModeController } from './diff-mode';
 import { getMergedSnapshots, filterDiffering, SnapshotSourceUnavailableError } from './snapshot-source';
@@ -24,25 +25,24 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     this.progressHolder?.notice?.hide();
     this.progressHolder = null;
   }
-  /** 重建快照的诊断日志：写插件目录下 rebuild.log，进程冻死后可从磁盘读取定位停点 */
-  private rebuildLogPath(): string {
-    return `${this.app.vault.configDir}/plugins/review-edit/rebuild.log`;
-  }
   private logChain: Promise<void> = Promise.resolve();
 
-  /** SettingsHost：设置面板的诊断锚点（按钮点击等事件也进 rebuild.log） */
+  /** SettingsHost：设置面板的诊断锚点（按钮点击等事件也进诊断日志）；生产构建下 appendLog 直接短路 */
   diagLog(line: string): void {
     this.appendLog(line);
   }
 
+  /** 诊断日志：写插件目录 rebuild.log，进程冻死后可从磁盘读取定位停点 */
   private appendLog(line: string): void {
+    if (!__DIAG__) return;
     // performance.memory 是 Chromium 私有 API，取不到就空串
     const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     const heap = mem ? ` heapMB=${Math.round(mem.usedJSHeapSize / 1048576)}` : '';
     const text = `${new Date().toISOString()} ${line}${heap}\n`;
+    const logPath = `${this.app.vault.configDir}/plugins/review-edit/rebuild.log`;
     // 链式 append 保证顺序；不阻塞扫描主流程
     this.logChain = this.logChain
-      .then(() => this.app.vault.adapter.append(this.rebuildLogPath(), text))
+      .then(() => this.app.vault.adapter.append(logPath, text))
       .then(() => undefined, () => {});
   }
 
@@ -155,17 +155,26 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
     this.progressHolder = progress;
     let lastPaint = 0;
     this.logChain = Promise.resolve();
-    // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在。
-    // 保留到结束后 35 秒——两次实测的堵死都发生在扫描末尾/收尾窗口，覆盖完整嫌疑区间。
-    const heartbeat = window.setInterval(() => this.appendLog('heartbeat'), 5000);
-    this.registerInterval(heartbeat);
-    this.registerInterval(window.setTimeout(() => window.clearInterval(heartbeat), 35_000));
+    if (__DIAG__) {
+      // 心跳：主线程被外来同步任务堵死时心跳与扫描行同时停止；扫描自身 await 卡死时心跳仍在。
+      // 保留到结束后 35 秒——两次实测的堵死都发生在扫描末尾/收尾窗口，覆盖完整嫌疑区间。
+      const heartbeat = window.setInterval(() => this.appendLog('heartbeat'), 5000);
+      this.registerInterval(heartbeat);
+      this.registerInterval(window.setTimeout(() => window.clearInterval(heartbeat), 35_000));
+    }
     try {
-      // 追加而非清空：冻死那次运行的日志要保留到事后取证，不被下次运行覆盖（诊断期）
-      await this.app.vault.adapter
-        .append(this.rebuildLogPath(), `\n${new Date().toISOString()} rebuild-start\n`)
-        .catch(() => {});
-      this.appendLog('scan-begin');
+      if (__DIAG__) {
+        // 追加而非清空：冻死那次运行的日志要保留到事后取证；超过 1MB 时重写，避免无上限增长
+        const logPath = `${this.app.vault.configDir}/plugins/review-edit/rebuild.log`;
+        const stat = await this.app.vault.adapter.stat(logPath).catch(() => null);
+        if (stat && stat.size > 1_000_000) {
+          await this.app.vault.adapter.write(logPath, '').catch(() => {});
+        }
+        await this.app.vault.adapter
+          .append(logPath, `\n${new Date().toISOString()} rebuild-start\n`)
+          .catch(() => {});
+      }
+      if (__DIAG__) this.appendLog('scan-begin');
       const written = await runBaselineScan(this.app.vault, store, {
         shouldContinue: () => this.settings.ownSnapshotsEnabled && this.store === store,
         onProgress: (done, total) => {
@@ -177,29 +186,31 @@ export default class ReviewEditPlugin extends Plugin implements SettingsHost {
           else if (!progress.notice) progress.notice = new Notice(msg, 0);
           else progress.notice.setMessage(msg);
         },
-        onLog: line => this.appendLog(line),
+        onLog: __DIAG__ ? (line: string) => this.appendLog(line) : undefined,
       });
-      this.appendLog(`scan-return written=${written}`);
+      if (__DIAG__) this.appendLog(`scan-return written=${written}`);
       if (!this.settings.baselined) {
         this.settings.baselined = true;
         await this.saveSettings();
       }
       await this.logChain;
-      this.appendLog('completion-notice-next');
+      if (__DIAG__) this.appendLog('completion-notice-next');
       new Notice(t.noticeBaselineDone(written), 8000);
     } finally {
-      this.appendLog('rebuild-finally');
+      if (__DIAG__) this.appendLog('rebuild-finally');
       await this.logChain;
-      this.appendLog('hiding-progress');
+      if (__DIAG__) this.appendLog('hiding-progress');
       this.onBaselineProgressUI?.(null);
       this.hideProgressNotice();
-      this.appendLog('progress-hidden');
+      if (__DIAG__) this.appendLog('progress-hidden');
       this.baselineRunning = false;
       // 存活探针：结束后主线程仍活着才会打出这些行——堵死后日志止于探针之前
-      for (const d of [2000, 5000, 10000, 30000]) {
-        this.registerInterval(
-          window.setTimeout(() => this.appendLog(`alive +${d / 1000}s`), d)
-        );
+      if (__DIAG__) {
+        for (const d of [2000, 5000, 10000, 30000]) {
+          this.registerInterval(
+            window.setTimeout(() => this.appendLog(`alive +${d / 1000}s`), d)
+          );
+        }
       }
     }
   }

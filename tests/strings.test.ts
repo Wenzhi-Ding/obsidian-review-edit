@@ -36,3 +36,42 @@ describe('uiStrings', () => {
     expect(uiStrings().navCount(1, 5)).toBe('Diff 1/5');
   });
 });
+
+describe('自动快照设置文案', () => {
+  const NEW_KEYS = [
+    'settingsOwnSnapshotsSection',
+    'settingOwnSnapshotsName',
+    'settingOwnSnapshotsDesc',
+    'settingThresholdName',
+    'settingThresholdDesc',
+    'settingRetentionName',
+    'settingRetentionDesc',
+    'settingBaselineName',
+    'settingBaselineDesc',
+    'settingPurgeName',
+    'settingPurgeDesc',
+    'confirmPurgeTitle',
+    'confirmPurgeBody',
+    'confirmPurgeConfirm',
+    'confirmPurgeCancel',
+    'noticeStoreOpenFailed',
+    'noticePurgeDone',
+    'noticeOwnStoreReadFailed',
+  ] as const;
+
+  it('新键在 zh/en 两套里都是非空字符串', () => {
+    const zh = stringsForLocale('zh-cn') as unknown as Record<string, unknown>;
+    const en = stringsForLocale('en') as unknown as Record<string, unknown>;
+    for (const k of NEW_KEYS) {
+      expect(typeof zh[k]).toBe('string');
+      expect((zh[k] as string).length).toBeGreaterThan(0);
+      expect(typeof en[k]).toBe('string');
+      expect((en[k] as string).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('noticeBaselineDone 带条数插值', () => {
+    expect(stringsForLocale('zh-cn').noticeBaselineDone(42)).toBe('基线完成：写入 42 条快照');
+    expect(stringsForLocale('en').noticeBaselineDone(42)).toBe('Baseline complete: 42 snapshots written');
+  });
+});

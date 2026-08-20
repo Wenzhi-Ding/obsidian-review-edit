@@ -27,6 +27,26 @@ export interface UiStrings {
   revertButton: string;
   pickerTitle: (basename: string) => string;
   pickerCharCount: (chars: number) => string;
+  /** —— 自动快照（设置页 + 通知） —— */
+  settingsOwnSnapshotsSection: string;
+  settingOwnSnapshotsName: string;
+  settingOwnSnapshotsDesc: string;
+  settingThresholdName: string;
+  settingThresholdDesc: string;
+  settingRetentionName: string;
+  settingRetentionDesc: string;
+  settingBaselineName: string;
+  settingBaselineDesc: string;
+  settingPurgeName: string;
+  settingPurgeDesc: string;
+  confirmPurgeTitle: string;
+  confirmPurgeBody: string;
+  confirmPurgeConfirm: string;
+  confirmPurgeCancel: string;
+  noticeBaselineDone: (count: number) => string;
+  noticeStoreOpenFailed: string;
+  noticePurgeDone: string;
+  noticeOwnStoreReadFailed: string;
 }
 
 const zh: UiStrings = {
@@ -51,6 +71,25 @@ const zh: UiStrings = {
   revertButton: '撤销 ✕',
   pickerTitle: basename => `选择 ${basename} 的对比基准`,
   pickerCharCount: chars => `${chars} 字符`,
+  settingsOwnSnapshotsSection: '自动快照',
+  settingOwnSnapshotsName: '启用自动快照',
+  settingOwnSnapshotsDesc: '在每次编辑会话开始前自动保存笔记快照，供历史比对使用。快照只存储在本机，不上传。',
+  settingThresholdName: '会话边界阈值（分钟）',
+  settingThresholdDesc: '两次编辑的间隔超过该时长视为新的编辑会话，会话开始前的内容会被自动快照。范围 1–60。',
+  settingRetentionName: '快照保留天数',
+  settingRetentionDesc: '更早的自动快照会被自动清理。范围 1–365。',
+  settingBaselineName: '重建基线',
+  settingBaselineDesc: '为所有笔记写入当前内容的快照（内容未变化的自动跳过）。',
+  settingPurgeName: '清除全部自动快照',
+  settingPurgeDesc: '删除本插件保存的全部快照，操作不可恢复。',
+  confirmPurgeTitle: '清除全部自动快照',
+  confirmPurgeBody: '将删除本插件保存的全部快照，该操作不可恢复。确定继续吗？',
+  confirmPurgeConfirm: '清除',
+  confirmPurgeCancel: '取消',
+  noticeBaselineDone: count => `基线完成：写入 ${count} 条快照`,
+  noticeStoreOpenFailed: '自动快照库打开失败，自动快照已停用',
+  noticePurgeDone: '已清除全部自动快照',
+  noticeOwnStoreReadFailed: '读取自动快照失败，本次仅使用文件恢复的快照',
 };
 
 const en: UiStrings = {
@@ -75,6 +114,27 @@ const en: UiStrings = {
   revertButton: 'Revert ✕',
   pickerTitle: basename => `Choose a baseline for ${basename}`,
   pickerCharCount: chars => `${chars} chars`,
+  settingsOwnSnapshotsSection: 'Automatic snapshots',
+  settingOwnSnapshotsName: 'Enable automatic snapshots',
+  settingOwnSnapshotsDesc:
+    'Automatically snapshot notes before each editing session for later comparison. Snapshots never leave this device.',
+  settingThresholdName: 'Session boundary threshold (minutes)',
+  settingThresholdDesc:
+    'A gap longer than this between edits starts a new session; the pre-session content is snapshotted. Range 1–60.',
+  settingRetentionName: 'Snapshot retention (days)',
+  settingRetentionDesc: 'Older automatic snapshots are pruned automatically. Range 1–365.',
+  settingBaselineName: 'Rebuild baseline',
+  settingBaselineDesc: 'Snapshot the current content of all notes (unchanged notes are skipped).',
+  settingPurgeName: 'Purge all automatic snapshots',
+  settingPurgeDesc: 'Delete every snapshot stored by this plugin. This cannot be undone.',
+  confirmPurgeTitle: 'Purge all automatic snapshots',
+  confirmPurgeBody: 'All snapshots stored by this plugin will be deleted. This cannot be undone. Continue?',
+  confirmPurgeConfirm: 'Purge',
+  confirmPurgeCancel: 'Cancel',
+  noticeBaselineDone: count => `Baseline complete: ${count} snapshots written`,
+  noticeStoreOpenFailed: 'Failed to open the snapshot store; automatic snapshots are disabled',
+  noticePurgeDone: 'All automatic snapshots purged',
+  noticeOwnStoreReadFailed: 'Failed to read automatic snapshots; using File Recovery snapshots only',
 };
 
 export function stringsForLocale(locale: string): UiStrings {

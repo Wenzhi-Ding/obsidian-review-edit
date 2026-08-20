@@ -43,7 +43,7 @@ Expected: package.json devDependencies 出现 `fake-indexeddb`。
 创建 `tests/snapshot-store.test.ts`（node 环境即可，不加 jsdom 注解；`fake-indexeddb/global` 注册全局 indexedDB）：
 
 ```ts
-import 'fake-indexeddb/global';
+import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DB_NAME, SnapshotStore } from '../src/snapshot-store';
 
